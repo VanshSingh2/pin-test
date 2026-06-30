@@ -1,0 +1,654 @@
+{
+  "name": "📸 Instagram AI — Conversational Manager (Carousel + Video + Image)",
+  "nodes": [
+    {
+      "parameters": { "updates": ["message"], "additionalFields": {} },
+      "id": "ig-trigger", "name": "💬 Telegram Command",
+      "type": "n8n-nodes-base.telegramTrigger", "typeVersion": 1.2, "position": [-600, 400],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const msg=$input.first().json.message||{};\nreturn [{ json:{ chatId:String((msg.chat&&msg.chat.id)||''), text:(msg.text||'').trim() } }];"
+      },
+      "id": "ig-intake", "name": "🧠 Intake",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-380, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/ig_state?chat_id=eq.{{ $json.chatId }}&select=*",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "ig-load", "name": "💾 Load Chat State",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-160, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const intake=$('🧠 Intake').first().json;\nconst rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nconst state=rows[0]||{ niche:'', style:'', pending_action:null };\nconst pending=state.pending_action||null;\nconst sys=`You are the friendly, expert Instagram content manager for a creator. You chat naturally, understand requests, and CONFIRM before creating anything.\\n\\nCurrent settings:\\n- niche: \\\"${state.niche||'(not set)'}\\\"\\n- visual/video style: \\\"${state.style||'(not set)'}\\\"\\n- pending action awaiting confirmation: ${pending?JSON.stringify(pending):'(none)'}\\n\\nRules:\\n- If the user wants to set/change the niche or style, intent=set_config and fill set_niche/set_style.\\n- If the user asks to CREATE something (carousel, video/reel, or image), DO NOT create yet. intent=propose, fill action_type + topic (and slide_count for carousels, script if they pasted one), and write a short reply describing the plan and asking them to reply 'yes' to confirm.\\n- If the user confirms (yes/ok/go/do it) AND a pending action exists, intent=confirm and echo the pending action_type/topic/script/slide_count.\\n- If the user cancels, intent=cancel.\\n- Otherwise intent=chat and just reply helpfully.\\n- Everything you create must fit the niche and the chosen style. If niche or style is missing and they want to create, ask them to set it first (intent=chat).\\nRespond with STRICT JSON only.`;\nconst usr=`User message: \\\"${intake.text}\\\"\\nReturn JSON: {\\n \\\"reply\\\": \\\"natural language reply to send back\\\",\\n \\\"intent\\\": \\\"set_config | propose | confirm | cancel | chat\\\",\\n \\\"set_niche\\\": \\\"\\\", \\\"set_style\\\": \\\"\\\",\\n \\\"action_type\\\": \\\"carousel | video | image | none\\\",\\n \\\"topic\\\": \\\"\\\", \\\"script\\\": \\\"\\\", \\\"slide_count\\\": 5\\n}`;\nreturn [{ json:{ chatId:intake.chatId, niche:state.niche||'', style:state.style||'', pending, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:700 } } }];"
+      },
+      "id": "ig-brain-build", "name": "🧠 Manager Brain Prompt",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [60, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "ig-brain-ai", "name": "🤖 OpenRouter: Manager",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [280, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx=$('🧠 Manager Brain Prompt').first().json;\nlet o={};try{o=JSON.parse($input.first().json.choices[0].message.content);}catch(e){const m=(($input.first().json.choices||[{}])[0].message||{}).content||'';const mm=m.match(/\\{[\\s\\S]*\\}/);if(mm)o=JSON.parse(mm[0]);}\nconst pending=ctx.pending||{};\nconst action_type=(o.action_type&&o.action_type!=='none')?o.action_type:(pending.action_type||'none');\nreturn [{ json:{ chatId:ctx.chatId, niche:ctx.niche, style:ctx.style, reply:o.reply||'Okay!', intent:o.intent||'chat', set_niche:o.set_niche||'', set_style:o.set_style||'', action_type, topic:o.topic||pending.topic||'', script:o.script||pending.script||'', slide_count:Number(o.slide_count||pending.slide_count||5) } }];"
+      },
+      "id": "ig-brain-parse", "name": "📋 Parse Manager",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [500, 400]
+    },
+    {
+      "parameters": {
+        "rules": { "values": [
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "sc", "leftValue": "={{ $json.intent }}", "rightValue": "set_config", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "set_config" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "pr", "leftValue": "={{ $json.intent }}", "rightValue": "propose", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "propose" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "cf", "leftValue": "={{ $json.intent }}", "rightValue": "confirm", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "confirm" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "cn", "leftValue": "={{ $json.intent }}", "rightValue": "cancel", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "cancel" }
+        ]}, "options": { "fallbackOutput": "extra" }
+      },
+      "id": "ig-route", "name": "🔀 Route Intent",
+      "type": "n8n-nodes-base.switch", "typeVersion": 3, "position": [720, 400]
+    },
+
+    {
+      "parameters": {
+        "method": "POST", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/ig_state?on_conflict=chat_id",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "resolution=merge-duplicates" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id:$json.chatId, niche: ($json.set_niche || $json.niche || ''), style: ($json.set_style || $json.style || ''), updated_at: $now.toISO() }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "ig-save-config", "name": "💾 Save Niche/Style",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [960, 100]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('📋 Parse Manager').first().json.chatId }}",
+        "text": "={{ $('📋 Parse Manager').first().json.reply }}",
+        "additionalFields": {}
+      },
+      "id": "ig-reply-config", "name": "💬 Reply: Config Saved",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [1180, 100],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/ig_state?on_conflict=chat_id",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "resolution=merge-duplicates" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id:$json.chatId, niche:$json.niche, style:$json.style, pending_action:{ action_type:$json.action_type, topic:$json.topic, script:$json.script, slide_count:$json.slide_count }, updated_at:$now.toISO() }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "ig-save-pending", "name": "💾 Save Pending Action",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [960, 280]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('📋 Parse Manager').first().json.chatId }}",
+        "text": "={{ $('📋 Parse Manager').first().json.reply }}",
+        "additionalFields": {}
+      },
+      "id": "ig-reply-propose", "name": "💬 Reply: Proposal",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [1180, 280],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/ig_state?on_conflict=chat_id",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "resolution=merge-duplicates" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id:$json.chatId, pending_action:null, updated_at:$now.toISO() }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "ig-clear-pending", "name": "💾 Clear Pending",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [960, 460]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('📋 Parse Manager').first().json.chatId }}",
+        "text": "={{ $('📋 Parse Manager').first().json.reply }}",
+        "additionalFields": {}
+      },
+      "id": "ig-reply-cancel", "name": "💬 Reply: Cancelled",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [1180, 460],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('📋 Parse Manager').first().json.chatId }}",
+        "text": "={{ $('📋 Parse Manager').first().json.reply }}",
+        "additionalFields": {}
+      },
+      "id": "ig-reply-chat", "name": "💬 Reply: Chat",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [960, 640],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const m=$json;\nreturn [{ json:{ chatId:m.chatId, niche:m.niche, style:m.style, action_type:m.action_type, topic:m.topic, script:m.script, slide_count:Math.max(3,Math.min(10,Number(m.slide_count||5))), job:'ig_'+Date.now() } }];"
+      },
+      "id": "ig-confirm-prep", "name": "🧩 Prep Action",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [960, 820]
+    },
+    {
+      "parameters": {
+        "rules": { "values": [
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "ca", "leftValue": "={{ $json.action_type }}", "rightValue": "carousel", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "carousel" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "im", "leftValue": "={{ $json.action_type }}", "rightValue": "image", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "image" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "vi", "leftValue": "={{ $json.action_type }}", "rightValue": "video", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "video" }
+        ]}, "options": {}
+      },
+      "id": "ig-action-switch", "name": "🔀 Action Type",
+      "type": "n8n-nodes-base.switch", "typeVersion": 3, "position": [1180, 820]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const m=$json;\nconst n=m.slide_count||5;\nconst sys=`You are an expert Instagram carousel designer for the niche: \\\"${m.niche}\\\". Visual style: \\\"${m.style}\\\". Design a scroll-stopping ${n}-slide carousel. Respond STRICT JSON only.`;\nconst usr=`Topic: ${m.topic}\\nReturn JSON: {\\\"slides\\\":[{\\\"headline\\\":\\\"short on-image text\\\",\\\"image_prompt\\\":\\\"vivid image description for this slide, vertical 4:5, no text in image\\\"}],\\\"caption\\\":\\\"engaging IG caption with a hook line, value, CTA and 8-12 hashtags relevant to the niche\\\"}\\nProvide exactly ${n} slides.`;\nreturn [{ json:{ ...m, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.85, max_tokens:1500 } } }];"
+      },
+      "id": "car-plan", "name": "🗂️ Carousel: Plan Slides",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1500, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "car-plan-ai", "name": "🤖 OpenRouter: Carousel Plan",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1720, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "const m=$('🧩 Prep Action').first().json;\nlet o={};try{o=JSON.parse($input.first().json.choices[0].message.content);}catch(e){const mm=((($input.first().json.choices||[{}])[0].message||{}).content||'').match(/\\{[\\s\\S]*\\}/);if(mm)o=JSON.parse(mm[0]);}\nconst slides=(o.slides||[]).slice(0,m.slide_count||5);\nconst caption=o.caption||m.topic;\nreturn slides.map((s,i)=>({ json:{ chatId:m.chatId, niche:m.niche, style:m.style, topic:m.topic, job:m.job, caption, idx:i, headline:s.headline||'', image_prompt:s.image_prompt||m.topic } }));"
+      },
+      "id": "car-split", "name": "🖼️ Carousel: Split Slides",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1940, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: ($vars.OPENROUTER_IMAGE_MODEL||'openai/gpt-image-1'), modalities:['image','text'], messages:[{ role:'user', content: ('Vertical 4:5 Instagram image, no text in the image. Visual style: '+$json.style+'. '+$json.image_prompt) }] }) }}",
+        "options": { "timeout": 120000, "response": { "response": { "neverError": true } } }
+      },
+      "id": "car-img", "name": "🎨 OpenRouter: Slide Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2160, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base=$('🖼️ Carousel: Split Slides').item.json;\nconst resp=$json;let b64='';\ntry{ const msg=resp.choices&&resp.choices[0]&&resp.choices[0].message; if(msg&&msg.images&&msg.images[0]){ const u=msg.images[0].image_url?msg.images[0].image_url.url:msg.images[0].url; b64=(u||'').split(',').pop(); } else if(resp.data&&resp.data[0]&&resp.data[0].b64_json){ b64=resp.data[0].b64_json; } }catch(e){}\nreturn [{ json:{ ...base, img_b64:b64 } }];"
+      },
+      "id": "car-extract", "name": "🖼️ Extract Slide",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2380, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.imgbb.com/1/upload",
+        "sendBody": true, "contentType": "form-urlencoded",
+        "bodyParameters": { "parameters": [
+          { "name": "key", "value": "={{ $vars.IMGBB_API_KEY }}" },
+          { "name": "image", "value": "={{ $json.img_b64 }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "car-host", "name": "☁️ Imgbb: Host Slide",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2600, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "// run once for all slides\nconst slides=$('🖼️ Carousel: Split Slides').all().map(i=>i.json);\nconst hosts=$input.all().map(i=>i.json);\nconst m=$('🧩 Prep Action').first().json;\nconst caption=(slides[0]&&slides[0].caption)||m.topic;\nconst urls=hosts.map(h=>{ try{return h.data.display_url||h.data.url;}catch(e){return '';} }).filter(Boolean);\nconst profiles=[ $vars.BUFFER_PROFILE_ID_INSTAGRAM ].filter(Boolean);\nconst parts=[];\nprofiles.forEach(p=>parts.push('profile_ids[]='+encodeURIComponent(p)));\nparts.push('text='+encodeURIComponent(caption));\nif(urls[0]) parts.push('media[photo]='+encodeURIComponent(urls[0]));\nparts.push('now=true');\nreturn [{ json:{ chatId:m.chatId, job:m.job, niche:m.niche, style:m.style, topic:m.topic, caption, media_urls:urls, bufferBody:parts.join('&') } }];"
+      },
+      "id": "car-collect", "name": "📦 Carousel: Build Post",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2820, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.bufferapp.com/1/updates/create.json?access_token={{ $vars.BUFFER_ACCESS_TOKEN }}",
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/x-www-form-urlencoded",
+        "body": "={{ $json.bufferBody }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "car-buffer", "name": "📱 Buffer: Post Carousel",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [3040, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/ig_queue",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "return=minimal" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id:$('📦 Carousel: Build Post').first().json.chatId, type:'carousel', niche:$('📦 Carousel: Build Post').first().json.niche, style:$('📦 Carousel: Build Post').first().json.style, topic:$('📦 Carousel: Build Post').first().json.topic, caption:$('📦 Carousel: Build Post').first().json.caption, media_urls:$('📦 Carousel: Build Post').first().json.media_urls, status:'posted' }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "car-log", "name": "💾 Log Carousel",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [3260, 600]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('📦 Carousel: Build Post').first().json.chatId }}",
+        "text": "=✅ *Carousel created!* ({{ $('📦 Carousel: Build Post').first().json.media_urls.length }} slides)\n📌 Niche: {{ $('📦 Carousel: Build Post').first().json.niche }} · Style: {{ $('📦 Carousel: Build Post').first().json.style }}\n\nSlides:\n{{ $('📦 Carousel: Build Post').first().json.media_urls.join('\\n') }}\n\n_(Sent to Buffer. Buffer's classic API posts a single image — for a true multi-image IG carousel, use these URLs or the IG Graph API path noted in the docs.)_",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "car-notify", "name": "💬 Telegram: Carousel Done",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [3480, 600],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const m=$json;\nconst sys=`You are an Instagram single-post designer for the niche \\\"${m.niche}\\\", visual style \\\"${m.style}\\\". Respond STRICT JSON only.`;\nconst usr=`Topic: ${m.topic}\\nReturn JSON: {\\\"image_prompt\\\":\\\"vivid vertical 4:5 image description, no text in image\\\",\\\"caption\\\":\\\"engaging IG caption with hook, value, CTA and 8-12 niche hashtags\\\"}`;\nreturn [{ json:{ ...m, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.8, max_tokens:700 } } }];"
+      },
+      "id": "img-plan", "name": "🖼️ Image: Plan",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1500, 900]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "img-plan-ai", "name": "🤖 OpenRouter: Image Plan",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1720, 900]
+    },
+    {
+      "parameters": {
+        "jsCode": "const m=$('🧩 Prep Action').first().json;\nlet o={};try{o=JSON.parse($input.first().json.choices[0].message.content);}catch(e){const mm=((($input.first().json.choices||[{}])[0].message||{}).content||'').match(/\\{[\\s\\S]*\\}/);if(mm)o=JSON.parse(mm[0]);}\nreturn [{ json:{ ...m, image_prompt:o.image_prompt||m.topic, caption:o.caption||m.topic, imgReqBody:{ model:($vars.OPENROUTER_IMAGE_MODEL||'openai/gpt-image-1'), modalities:['image','text'], messages:[{ role:'user', content:('Vertical 4:5 Instagram image, no text in the image. Visual style: '+m.style+'. '+(o.image_prompt||m.topic)) }] } } }];"
+      },
+      "id": "img-parse", "name": "📋 Image: Parse",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1940, 900]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.imgReqBody) }}",
+        "options": { "timeout": 120000, "response": { "response": { "neverError": true } } }
+      },
+      "id": "img-gen", "name": "🎨 OpenRouter: Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2160, 900]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base=$('📋 Image: Parse').first().json;\nconst resp=$json;let b64='';\ntry{ const msg=resp.choices&&resp.choices[0]&&resp.choices[0].message; if(msg&&msg.images&&msg.images[0]){ const u=msg.images[0].image_url?msg.images[0].image_url.url:msg.images[0].url; b64=(u||'').split(',').pop(); } else if(resp.data&&resp.data[0]&&resp.data[0].b64_json){ b64=resp.data[0].b64_json; } }catch(e){}\nreturn [{ json:{ ...base, img_b64:b64 } }];"
+      },
+      "id": "img-extract", "name": "🖼️ Image: Extract",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2380, 900]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.imgbb.com/1/upload",
+        "sendBody": true, "contentType": "form-urlencoded",
+        "bodyParameters": { "parameters": [
+          { "name": "key", "value": "={{ $vars.IMGBB_API_KEY }}" },
+          { "name": "image", "value": "={{ $json.img_b64 }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "img-host", "name": "☁️ Imgbb: Host Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2600, 900]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base=$('📋 Image: Parse').first().json;\nlet url='';try{url=$json.data.display_url||$json.data.url;}catch(e){}\nconst profiles=[ $vars.BUFFER_PROFILE_ID_INSTAGRAM ].filter(Boolean);\nconst parts=[];profiles.forEach(p=>parts.push('profile_ids[]='+encodeURIComponent(p)));parts.push('text='+encodeURIComponent(base.caption));parts.push('media[photo]='+encodeURIComponent(url));parts.push('now=true');\nreturn [{ json:{ chatId:base.chatId, niche:base.niche, style:base.style, topic:base.topic, caption:base.caption, media_url:url, bufferBody:parts.join('&') } }];"
+      },
+      "id": "img-build", "name": "📦 Image: Build Post",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2820, 900]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.bufferapp.com/1/updates/create.json?access_token={{ $vars.BUFFER_ACCESS_TOKEN }}",
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/x-www-form-urlencoded",
+        "body": "={{ $json.bufferBody }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "img-buffer", "name": "📱 Buffer: Post Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [3040, 900]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('📦 Image: Build Post').first().json.chatId }}",
+        "text": "=✅ *Image post created!*\n📌 {{ $('📦 Image: Build Post').first().json.niche }} · {{ $('📦 Image: Build Post').first().json.style }}\n🖼️ {{ $('📦 Image: Build Post').first().json.media_url }}\n\n📝 {{ $('📦 Image: Build Post').first().json.caption }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "img-notify", "name": "💬 Telegram: Image Done",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [3260, 900],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const m=$json;\nconst sys=`You are a Reels scriptwriter AND editor for the niche \\\"${m.niche}\\\". Write a high-retention vertical Reel script and self-review it for hook strength and pacing. Visual style for all scenes: \\\"${m.style}\\\". Respond STRICT JSON only.`;\nlet usr;\nif(m.script){ usr=`Use THIS script (keep the creator's words, split into 4 scenes, add visuals in the chosen style):\\n\\\"${m.script}\\\"\\nReturn JSON: {\\\"caption\\\":\\\"IG caption + hashtags\\\",\\\"scenes\\\":[{\\\"narration\\\":\\\"...\\\",\\\"on_screen_text\\\":\\\"<=6 words\\\",\\\"image_prompt\\\":\\\"vertical 9:16 still, no text\\\",\\\"motion_prompt\\\":\\\"how to animate\\\"}]}`; }\nelse { usr=`Topic: ${m.topic}\\nWrite a 4-scene Reel: pattern-interrupt hook -> value -> payoff -> CTA. Total 80-120 words.\\nReturn JSON: {\\\"caption\\\":\\\"IG caption + hashtags\\\",\\\"scenes\\\":[{\\\"narration\\\":\\\"...\\\",\\\"on_screen_text\\\":\\\"<=6 words\\\",\\\"image_prompt\\\":\\\"vertical 9:16 still, no text\\\",\\\"motion_prompt\\\":\\\"how to animate\\\"}]}`; }\nreturn [{ json:{ ...m, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.85, max_tokens:1400 } } }];"
+      },
+      "id": "vid-script", "name": "✍️ Reel: Script (Write+Review)",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1500, 1220]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "vid-script-ai", "name": "🤖 OpenRouter: Reel Script",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1720, 1220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const m=$('🧩 Prep Action').first().json;\nlet o={};try{o=JSON.parse($input.first().json.choices[0].message.content);}catch(e){const mm=((($input.first().json.choices||[{}])[0].message||{}).content||'').match(/\\{[\\s\\S]*\\}/);if(mm)o=JSON.parse(mm[0]);}\nconst scenes=(o.scenes||[]).slice(0,6).map((s,i)=>({ idx:i, narration:s.narration||'', on_screen_text:s.on_screen_text||'', image_prompt:s.image_prompt||m.topic, motion_prompt:s.motion_prompt||'slow cinematic push-in' }));\nconst caption=o.caption||m.topic;\nreturn scenes.map(s=>({ json:{ chatId:m.chatId, niche:m.niche, style:m.style, topic:m.topic, job:m.job, caption, scene:s } }));"
+      },
+      "id": "vid-split", "name": "🎬 Reel: Split Scenes",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1940, 1220]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: ($vars.OPENROUTER_IMAGE_MODEL||'openai/gpt-image-1'), modalities:['image','text'], messages:[{ role:'user', content: ('Vertical 9:16 still, no text in the image. Visual style: '+$json.style+'. '+$json.scene.image_prompt) }] }) }}",
+        "options": { "timeout": 120000, "response": { "response": { "neverError": true } } }
+      },
+      "id": "vid-img", "name": "🎨 OpenRouter: Scene Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2160, 1220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base=$('🎬 Reel: Split Scenes').item.json;\nconst resp=$json;let b64='';\ntry{ const msg=resp.choices&&resp.choices[0]&&resp.choices[0].message; if(msg&&msg.images&&msg.images[0]){ const u=msg.images[0].image_url?msg.images[0].image_url.url:msg.images[0].url; b64=(u||'').split(',').pop(); } else if(resp.data&&resp.data[0]&&resp.data[0].b64_json){ b64=resp.data[0].b64_json; } }catch(e){}\nreturn [{ json:{ ...base, img_b64:b64 } }];"
+      },
+      "id": "vid-img-extract", "name": "🖼️ Scene: Extract",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2380, 1220]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.imgbb.com/1/upload",
+        "sendBody": true, "contentType": "form-urlencoded",
+        "bodyParameters": { "parameters": [
+          { "name": "key", "value": "={{ $vars.IMGBB_API_KEY }}" },
+          { "name": "image", "value": "={{ $json.img_b64 }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "vid-img-host", "name": "☁️ Imgbb: Host Scene",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2600, 1220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base=$('🖼️ Scene: Extract').item.json;\nlet url='';try{url=$json.data.display_url||$json.data.url;}catch(e){}\nconst body={ model:($vars.OPENROUTER_VIDEO_MODEL||'google/veo-3.1-lite'), prompt:(base.scene.motion_prompt||'slow cinematic push-in')+', '+base.style+', high quality motion', duration:Number($vars.VIDEO_CLIP_SECONDS||4), resolution:'720p', aspect_ratio:'9:16', generate_audio:false, frame_images:[{ type:'image_url', image_url:{ url }, frame_type:'first_frame' }] };\nreturn [{ json:{ ...base, scene_image_url:url, videoBody:body } }];"
+      },
+      "id": "vid-prep", "name": "🧩 Scene: Prep Video",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2820, 1220]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/videos",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.videoBody) }}",
+        "options": { "timeout": 60000, "response": { "response": { "neverError": true } } }
+      },
+      "id": "vid-submit", "name": "🎬 OpenRouter: Image→Video",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [3040, 1220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const preps=$('🧩 Scene: Prep Video').all().map(i=>i.json);\nconst resps=$input.all().map(i=>i.json);\nconst m=$('🧩 Prep Action').first().json;\nconst caption=(preps[0]&&preps[0].caption)||m.topic;\nconst jobs=resps.map((r,i)=>({ idx:i, jobId:r.id||'', status:r.status||'queued', polling_url:(r.polling_url||('/api/v1/videos/'+(r.id||''))), clip_url:'', narration:(preps[i]&&preps[i].scene.narration)||'', on_screen_text:(preps[i]&&preps[i].scene.on_screen_text)||'' }));\nreturn [{ json:{ chatId:m.chatId, niche:m.niche, style:m.style, topic:m.topic, job:m.job, caption, jobs, attempts:0 } }];"
+      },
+      "id": "vid-collect", "name": "📦 Collect Video Jobs",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3260, 1220]
+    },
+    {
+      "parameters": { "amount": 30, "unit": "seconds" },
+      "id": "vid-wait", "name": "⏳ Wait 30s",
+      "type": "n8n-nodes-base.wait", "typeVersion": 1.1, "position": [3480, 1220]
+    },
+    {
+      "parameters": { "fieldToSplitOut": "jobs", "include": "allOtherFields", "options": {} },
+      "id": "vid-poll-split", "name": "🔁 Split Jobs",
+      "type": "n8n-nodes-base.splitOut", "typeVersion": 1, "position": [3700, 1220]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://openrouter.ai{{ $json.jobs.polling_url.startsWith('http') ? $json.jobs.polling_url.replace('https://openrouter.ai','') : $json.jobs.polling_url }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" }] },
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "vid-poll", "name": "🔁 OpenRouter: Poll",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [3920, 1220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const c=$('📦 Collect Video Jobs').first().json;\nconst polls=$input.all().map(i=>i.json);\nconst jobs=c.jobs.map((j,i)=>{ const p=polls[i]||{}; const status=p.status||j.status; let url=j.clip_url; if(status==='completed'){ url=(p.unsigned_urls&&p.unsigned_urls[0])||('https://openrouter.ai/api/v1/videos/'+j.jobId+'/content?index=0'); } return { ...j, status, clip_url:url }; });\nconst attempts=(c.attempts||0)+1;\nconst allDone=jobs.every(j=>j.status==='completed'&&j.clip_url);\nconst anyFailed=jobs.some(j=>['failed','cancelled','expired'].includes(j.status));\nreturn [{ json:{ ...c, jobs, attempts, done: allDone||anyFailed||attempts>=20 } }];"
+      },
+      "id": "vid-poll-collect", "name": "📋 Clips Ready?",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [4140, 1220]
+    },
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "d", "leftValue": "={{ $json.done }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equal" } }], "combinator": "and" }
+      },
+      "id": "vid-if", "name": "❓ All Clips Ready?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [4360, 1220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const m=$json;\nconst KEY=$vars.OPENAI_API_KEY;const OR=$vars.OPENROUTER_API_KEY;\nconst FONT=$vars.FFMPEG_FONT||'/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';\nconst voice=$vars.OPENAI_TTS_VOICE||'nova';\nconst dir='/tmp/'+m.job;const b64=(s)=>Buffer.from(String(s||''),'utf8').toString('base64');\nconst L=['set -e','export DIR='+dir,'mkdir -p $DIR','cd $DIR'];const list=[];\n(m.jobs||[]).forEach((j,i)=>{\n  const auth=j.clip_url.indexOf('openrouter.ai/api')>-1?`-H \\\"Authorization: Bearer ${OR}\\\"`:'';\n  L.push(`curl -sL ${auth} \\\"${j.clip_url}\\\" -o clip_${i}.mp4`);\n  const tts=JSON.stringify({model:'tts-1-hd',voice:voice,input:j.narration||m.topic});\n  L.push(`echo \\\"${b64(tts)}\\\" | base64 -d > tts_${i}.json`);\n  L.push(`curl -s https://api.openai.com/v1/audio/speech -H \\\"Authorization: Bearer ${KEY}\\\" -H \\\"Content-Type: application/json\\\" --data @tts_${i}.json -o voice_${i}.mp3`);\n  L.push(`echo \\\"${b64(j.on_screen_text)}\\\" | base64 -d > cap_${i}.txt`);\n  L.push(`D=$(ffprobe -v error -show_entries format=duration -of csv=p=0 voice_${i}.mp3)`);\n  const vf=`scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,drawtext=fontfile=${FONT}:textfile=cap_${i}.txt:fontcolor=white:fontsize=64:box=1:boxcolor=black@0.55:boxborderw=26:x=(w-text_w)/2:y=h-560`;\n  L.push(`ffmpeg -y -stream_loop -1 -t $D -i clip_${i}.mp4 -i voice_${i}.mp3 -vf \\\"${vf}\\\" -map 0:v -map 1:a -r 30 -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -shortest scene_${i}.mp4`);\n  list.push(`file 'scene_${i}.mp4'`);\n});\nL.push(`printf \\\"${list.join('\\\\n')}\\\\n\\\" > list.txt`);\nL.push(`ffmpeg -y -f concat -safe 0 -i list.txt -c copy ${dir}/final.mp4`);\nL.push(`echo DONE ${dir}/final.mp4`);\nreturn [{ json:{ ...m, outPath:dir+'/final.mp4', ffmpegScript:L.join('\\n') } }];"
+      },
+      "id": "vid-ffmpeg-build", "name": "🎞️ Build FFmpeg Job",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [4580, 1120]
+    },
+    {
+      "parameters": { "command": "={{ $json.ffmpegScript }}" },
+      "id": "vid-exec", "name": "🖥️ FFmpeg: Render",
+      "type": "n8n-nodes-base.executeCommand", "typeVersion": 1, "position": [4800, 1120]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ $('🎞️ Build FFmpeg Job').first().json.outPath }}",
+        "options": { "dataPropertyName": "data" }
+      },
+      "id": "vid-read", "name": "📂 Read MP4",
+      "type": "n8n-nodes-base.readWriteFile", "typeVersion": 1, "position": [5020, 1120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL }}/storage/v1/object/videos/{{ $('🎞️ Build FFmpeg Job').first().json.job }}.mp4",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "video/mp4" },
+          { "name": "x-upsert", "value": "true" }
+        ]},
+        "sendBody": true, "contentType": "binaryData", "inputDataFieldName": "data",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "vid-upload", "name": "☁️ Upload to Supabase Storage",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [5240, 1120]
+    },
+    {
+      "parameters": {
+        "jsCode": "const m=$('🎞️ Build FFmpeg Job').first().json;\nconst publicUrl=`${$vars.SUPABASE_URL}/storage/v1/object/public/videos/${m.job}.mp4`;\nconst profiles=[ $vars.BUFFER_PROFILE_ID_INSTAGRAM ].filter(Boolean);\nconst parts=[];profiles.forEach(p=>parts.push('profile_ids[]='+encodeURIComponent(p)));parts.push('text='+encodeURIComponent(m.caption||m.topic));parts.push('media[video]='+encodeURIComponent(publicUrl));parts.push('now=true');\nreturn [{ json:{ chatId:m.chatId, niche:m.niche, style:m.style, topic:m.topic, caption:m.caption, video_url:publicUrl, bufferBody:parts.join('&') } }];"
+      },
+      "id": "vid-finalize", "name": "🧮 Finalize Reel",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5460, 1120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.bufferapp.com/1/updates/create.json?access_token={{ $vars.BUFFER_ACCESS_TOKEN }}",
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/x-www-form-urlencoded",
+        "body": "={{ $json.bufferBody }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "vid-buffer", "name": "📱 Buffer: Post Reel",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [5680, 1120]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('🧮 Finalize Reel').first().json.chatId }}",
+        "text": "=✅ *Reel created & sent to Buffer!*\n📌 {{ $('🧮 Finalize Reel').first().json.niche }} · {{ $('🧮 Finalize Reel').first().json.style }}\n🎬 {{ $('🧮 Finalize Reel').first().json.video_url }}\n\n📝 {{ $('🧮 Finalize Reel').first().json.caption }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "vid-notify", "name": "💬 Telegram: Reel Done",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [5900, 1120],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    }
+  ],
+
+  "connections": {
+    "💬 Telegram Command":        { "main": [[{ "node": "🧠 Intake",                   "type": "main", "index": 0 }]] },
+    "🧠 Intake":                  { "main": [[{ "node": "💾 Load Chat State",          "type": "main", "index": 0 }]] },
+    "💾 Load Chat State":         { "main": [[{ "node": "🧠 Manager Brain Prompt",     "type": "main", "index": 0 }]] },
+    "🧠 Manager Brain Prompt":    { "main": [[{ "node": "🤖 OpenRouter: Manager",       "type": "main", "index": 0 }]] },
+    "🤖 OpenRouter: Manager":     { "main": [[{ "node": "📋 Parse Manager",            "type": "main", "index": 0 }]] },
+    "📋 Parse Manager":           { "main": [[{ "node": "🔀 Route Intent",             "type": "main", "index": 0 }]] },
+    "🔀 Route Intent": { "main": [
+      [{ "node": "💾 Save Niche/Style",    "type": "main", "index": 0 }],
+      [{ "node": "💾 Save Pending Action", "type": "main", "index": 0 }],
+      [{ "node": "🧩 Prep Action",         "type": "main", "index": 0 }],
+      [{ "node": "💾 Clear Pending",       "type": "main", "index": 0 }],
+      [{ "node": "💬 Reply: Chat",         "type": "main", "index": 0 }]
+    ]},
+    "💾 Save Niche/Style":        { "main": [[{ "node": "💬 Reply: Config Saved",      "type": "main", "index": 0 }]] },
+    "💾 Save Pending Action":     { "main": [[{ "node": "💬 Reply: Proposal",          "type": "main", "index": 0 }]] },
+    "💾 Clear Pending":           { "main": [[{ "node": "💬 Reply: Cancelled",         "type": "main", "index": 0 }]] },
+    "🧩 Prep Action":             { "main": [[{ "node": "🔀 Action Type",             "type": "main", "index": 0 }]] },
+    "🔀 Action Type": { "main": [
+      [{ "node": "🗂️ Carousel: Plan Slides",       "type": "main", "index": 0 }],
+      [{ "node": "🖼️ Image: Plan",                  "type": "main", "index": 0 }],
+      [{ "node": "✍️ Reel: Script (Write+Review)",  "type": "main", "index": 0 }]
+    ]},
+
+    "🗂️ Carousel: Plan Slides":   { "main": [[{ "node": "🤖 OpenRouter: Carousel Plan", "type": "main", "index": 0 }]] },
+    "🤖 OpenRouter: Carousel Plan": { "main": [[{ "node": "🖼️ Carousel: Split Slides",  "type": "main", "index": 0 }]] },
+    "🖼️ Carousel: Split Slides":  { "main": [[{ "node": "🎨 OpenRouter: Slide Image",   "type": "main", "index": 0 }]] },
+    "🎨 OpenRouter: Slide Image": { "main": [[{ "node": "🖼️ Extract Slide",             "type": "main", "index": 0 }]] },
+    "🖼️ Extract Slide":          { "main": [[{ "node": "☁️ Imgbb: Host Slide",          "type": "main", "index": 0 }]] },
+    "☁️ Imgbb: Host Slide":       { "main": [[{ "node": "📦 Carousel: Build Post",       "type": "main", "index": 0 }]] },
+    "📦 Carousel: Build Post":    { "main": [[{ "node": "📱 Buffer: Post Carousel",      "type": "main", "index": 0 }]] },
+    "📱 Buffer: Post Carousel":   { "main": [[{ "node": "💾 Log Carousel",               "type": "main", "index": 0 }]] },
+    "💾 Log Carousel":            { "main": [[{ "node": "💬 Telegram: Carousel Done",    "type": "main", "index": 0 }]] },
+
+    "🖼️ Image: Plan":            { "main": [[{ "node": "🤖 OpenRouter: Image Plan",     "type": "main", "index": 0 }]] },
+    "🤖 OpenRouter: Image Plan":  { "main": [[{ "node": "📋 Image: Parse",              "type": "main", "index": 0 }]] },
+    "📋 Image: Parse":            { "main": [[{ "node": "🎨 OpenRouter: Image",          "type": "main", "index": 0 }]] },
+    "🎨 OpenRouter: Image":       { "main": [[{ "node": "🖼️ Image: Extract",            "type": "main", "index": 0 }]] },
+    "🖼️ Image: Extract":         { "main": [[{ "node": "☁️ Imgbb: Host Image",          "type": "main", "index": 0 }]] },
+    "☁️ Imgbb: Host Image":       { "main": [[{ "node": "📦 Image: Build Post",          "type": "main", "index": 0 }]] },
+    "📦 Image: Build Post":       { "main": [[{ "node": "📱 Buffer: Post Image",         "type": "main", "index": 0 }]] },
+    "📱 Buffer: Post Image":      { "main": [[{ "node": "💬 Telegram: Image Done",       "type": "main", "index": 0 }]] },
+
+    "✍️ Reel: Script (Write+Review)": { "main": [[{ "node": "🤖 OpenRouter: Reel Script", "type": "main", "index": 0 }]] },
+    "🤖 OpenRouter: Reel Script": { "main": [[{ "node": "🎬 Reel: Split Scenes",        "type": "main", "index": 0 }]] },
+    "🎬 Reel: Split Scenes":      { "main": [[{ "node": "🎨 OpenRouter: Scene Image",    "type": "main", "index": 0 }]] },
+    "🎨 OpenRouter: Scene Image": { "main": [[{ "node": "🖼️ Scene: Extract",            "type": "main", "index": 0 }]] },
+    "🖼️ Scene: Extract":         { "main": [[{ "node": "☁️ Imgbb: Host Scene",          "type": "main", "index": 0 }]] },
+    "☁️ Imgbb: Host Scene":       { "main": [[{ "node": "🧩 Scene: Prep Video",          "type": "main", "index": 0 }]] },
+    "🧩 Scene: Prep Video":       { "main": [[{ "node": "🎬 OpenRouter: Image→Video",    "type": "main", "index": 0 }]] },
+    "🎬 OpenRouter: Image→Video": { "main": [[{ "node": "📦 Collect Video Jobs",         "type": "main", "index": 0 }]] },
+    "📦 Collect Video Jobs":      { "main": [[{ "node": "⏳ Wait 30s",                   "type": "main", "index": 0 }]] },
+    "⏳ Wait 30s":                { "main": [[{ "node": "🔁 Split Jobs",                "type": "main", "index": 0 }]] },
+    "🔁 Split Jobs":              { "main": [[{ "node": "🔁 OpenRouter: Poll",           "type": "main", "index": 0 }]] },
+    "🔁 OpenRouter: Poll":        { "main": [[{ "node": "📋 Clips Ready?",              "type": "main", "index": 0 }]] },
+    "📋 Clips Ready?":            { "main": [[{ "node": "❓ All Clips Ready?",           "type": "main", "index": 0 }]] },
+    "❓ All Clips Ready?": { "main": [
+      [{ "node": "🎞️ Build FFmpeg Job", "type": "main", "index": 0 }],
+      [{ "node": "⏳ Wait 30s",         "type": "main", "index": 0 }]
+    ]},
+    "🎞️ Build FFmpeg Job":       { "main": [[{ "node": "🖥️ FFmpeg: Render",            "type": "main", "index": 0 }]] },
+    "🖥️ FFmpeg: Render":         { "main": [[{ "node": "📂 Read MP4",                  "type": "main", "index": 0 }]] },
+    "📂 Read MP4":                { "main": [[{ "node": "☁️ Upload to Supabase Storage", "type": "main", "index": 0 }]] },
+    "☁️ Upload to Supabase Storage": { "main": [[{ "node": "🧮 Finalize Reel",          "type": "main", "index": 0 }]] },
+    "🧮 Finalize Reel":           { "main": [[{ "node": "📱 Buffer: Post Reel",          "type": "main", "index": 0 }]] },
+    "📱 Buffer: Post Reel":       { "main": [[{ "node": "💬 Telegram: Reel Done",        "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true },
+  "id": "wf-instagram-v1",
+  "tags": [{ "id": "social-ai", "name": "Social AI" }]
+}

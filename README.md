@@ -6,6 +6,7 @@ This repo contains **two** all-in-one n8n automation workflows, both backed by *
 |----------|------|--------------|
 | 📌 **Pinterest** | `workflows/pinterest_ai_complete.json` | Trends → ideas → DALL-E images → SEO copy → post (Pinterest API **or** Buffer toggle) |
 | 🎬 **YouTube + TikTok** | `workflows/youtube_tiktok_v4_ondemand_openrouter.json` | ⭐ **v4** — on-demand Telegram bot, OpenRouter image→video, Script Writer + Doctor |
+| 📸 **Instagram** | `workflows/instagram_v1_telegram.json` | Conversational bot — set niche+style, then make carousel / image / Reel, Buffer posting |
 
 Jump to: [Pinterest](#-pinterest-automation) · [YouTube + TikTok](#-youtube--tiktok-automation)
 
@@ -360,3 +361,38 @@ config/video_v4_setup.md                              ← v4 on-demand + OpenRou
 The YouTube + TikTok workflow's agent architecture is inspired by
 [darkzOGx/youtube-automation-agent](https://github.com/darkzOGx/youtube-automation-agent)
 by Haithum Abdelfattah.
+
+
+---
+
+## 📸 Instagram Automation (conversational)
+
+`workflows/instagram_v1_telegram.json` is a **chat-driven** Instagram manager. You talk to it on Telegram; it understands, **confirms**, then creates and posts. Full guide: [`config/instagram_setup.md`](config/instagram_setup.md).
+
+### What it does
+- **🧠 Manager Brain** (OpenRouter LLM) — conversational; proposes a plan and waits for your "yes" before creating
+- **Per-chat niche + style** remembered in Supabase — everything (scripts, images, slides, Reels) matches them
+- **Visual style** you choose: _Disney Pixar 3D_, _animated stick figure_, _cinematic realism_, _anime_, etc.
+- Three creators: **Carousel**, **Image**, **Reel** (AI video via OpenRouter image→video + FFmpeg)
+- **Buffer** posting to Instagram
+
+### Example chat
+```
+you: set niche to budget travel for students
+bot: ✅ niche saved
+you: use Disney Pixar 3D style
+bot: ✅ style saved
+you: make a 6-slide carousel on packing hacks
+bot: Here's the plan... reply 'yes' to create
+you: yes
+bot: ✅ Carousel created! [slide URLs]
+```
+
+> Buffer's classic API posts one media per update, so Reels/images post cleanly; for true multi-image carousels the bot returns all slide URLs (or switch that node to the Instagram Graph API). See the setup doc.
+
+### Files
+```
+workflows/instagram_v1_telegram.json    ← the conversational Instagram workflow
+config/instagram_supabase_schema.sql     ← ig_state (niche/style/pending) + ig_queue
+config/instagram_setup.md                ← full setup + commands
+```
