@@ -220,15 +220,22 @@ A second all-in-one workflow (`workflows/youtube_tiktok_complete.json`) that cre
 | 6. Publishing | Uploads on schedule | YouTube Data API v3 / TikTok Content Posting API |
 | 7. Analytics & Strategy | Daily stats + weekly review | OpenAI + Supabase |
 
-### 🎛️ Platform Toggle
+### 🎛️ Platform + Posting-Method Toggles
 
-Open the **⚙️ CONTROL PANEL** node and set `platform`:
+Open the **⚙️ CONTROL PANEL** node and set two toggles:
 
+**`platform`** — which channel:
 | Value | Result |
 |-------|--------|
 | `youtube` | Publish to YouTube only |
 | `tiktok` | Publish to TikTok only |
 | `both` | Publish to YouTube **and** TikTok |
+
+**`postingMethod`** — how to post:
+| Value | Result |
+|-------|--------|
+| `api` | Native YouTube Data API + TikTok Content Posting API |
+| `buffer` | Post via **Buffer** to your connected YouTube/TikTok channels |
 
 Other toggles: `videosPerRun`, `bufferDays` (smart buffer — skip generating if enough queued), `niche`, `videoStyle`, `scheduleHour`, `enabled` (master switch).
 

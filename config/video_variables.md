@@ -17,8 +17,12 @@ multi-agent architecture, rebuilt for n8n with YouTube **and** TikTok publishing
 | `SUPABASE_URL` | `https://xxxx.supabase.co` | Supabase → Settings → API |
 | `SUPABASE_SERVICE_KEY` | `eyJ...` | Supabase → Settings → API → `service_role` |
 | `TIKTOK_ACCESS_TOKEN` | `act....` | TikTok for Developers (Content Posting API) |
+| `BUFFER_ACCESS_TOKEN` | `1/...` | buffer.com/developers (only if `postingMethod = buffer`) |
+| `BUFFER_PROFILE_ID_YOUTUBE` | `...` | Buffer profile id of your connected YouTube channel |
+| `BUFFER_PROFILE_ID_TIKTOK` | `...` | Buffer profile id of your connected TikTok account |
 
 > YouTube uses an **OAuth2 credential** (not a variable) — see below.
+> Buffer profile IDs: `GET https://api.bufferapp.com/1/profiles.json?access_token=YOUR_TOKEN`
 
 ---
 
@@ -51,13 +55,30 @@ Open the **⚙️ CONTROL PANEL** node to configure everything without touching 
 
 | Field | Options | Meaning |
 |-------|---------|---------|
-| `platform` | `youtube` \| `tiktok` \| `both` | **Where videos get published** |
+| `platform` | `youtube` \| `tiktok` \| `both` | **Which channel** gets the video |
+| `postingMethod` | `api` \| `buffer` | **How** to post: native APIs, or via Buffer |
 | `videosPerRun` | number | Videos generated per run |
 | `bufferDays` | number | Skip generating if this many already queued (smart buffer) |
 | `niche` | text | Your content niche |
 | `videoStyle` | text | Visual style fed to the script/render |
 | `scheduleHour` | 0-23 | Hour of day to publish |
 | `enabled` | `true` \| `false` | Master on/off switch |
+
+### How the two toggles combine
+
+| `platform` | `postingMethod` | Result |
+|-----------|-----------------|--------|
+| `youtube` | `api` | Upload via YouTube Data API v3 |
+| `tiktok` | `api` | Post via TikTok Content Posting API |
+| `both` | `api` | Both native APIs |
+| `youtube` | `buffer` | Buffer posts to your YouTube channel |
+| `tiktok` | `buffer` | Buffer posts to your TikTok account |
+| `both` | `buffer` | Buffer posts to **both** connected profiles |
+
+> **Buffer mode caveat:** Buffer's classic API has limited/variable support for native video
+> uploads, and Pinterest/TikTok/YouTube video posting depends on your Buffer plan and connected
+> channels. Use `api` mode for the most reliable native publishing; use `buffer` mode if you
+> already manage these channels through Buffer and want a single scheduling hub.
 
 ---
 

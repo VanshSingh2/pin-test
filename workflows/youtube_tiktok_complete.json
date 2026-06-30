@@ -17,13 +17,14 @@
           { "id": "c3", "name": "bufferDays",   "value": 3,         "type": "number" },
           { "id": "c4", "name": "niche",        "value": "motivational and self-improvement shorts for young women", "type": "string" },
           { "id": "c5", "name": "videoStyle",   "value": "faceless vertical short, cinematic b-roll, bold captions", "type": "string" },
-          { "id": "c6", "name": "scheduleHour", "value": 14,        "type": "number" },
-          { "id": "c7", "name": "enabled",      "value": true,      "type": "boolean" }
+          { "id": "c6", "name": "scheduleHour",  "value": 14,        "type": "number" },
+          { "id": "c7", "name": "postingMethod", "value": "api",     "type": "string" },
+          { "id": "c8", "name": "enabled",       "value": true,      "type": "boolean" }
         ]}
       },
       "id": "ctrl", "name": "⚙️ CONTROL PANEL",
       "type": "n8n-nodes-base.set", "typeVersion": 3.4, "position": [20, 200],
-      "notes": "TOGGLE:\nplatform = 'youtube' | 'tiktok' | 'both'\nvideosPerRun = videos created per run\nbufferDays = skip generating if this many already queued\nenabled = master on/off"
+      "notes": "TOGGLES:\nplatform = 'youtube' | 'tiktok' | 'both'  (which channel)\npostingMethod = 'api' | 'buffer'  (HOW to post)\n   api    = native YouTube Data API + TikTok Content Posting API\n   buffer = post via Buffer to the connected YT/TikTok channels\nvideosPerRun = videos created per run\nbufferDays = skip generating if this many already queued\nscheduleHour = hour of day to publish\nenabled = master on/off"
     },
     {
       "parameters": {
@@ -334,6 +335,42 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "pm", "leftValue": "={{ $json.postingMethod || $('⚙️ CONTROL PANEL').first().json.postingMethod }}", "rightValue": "buffer", "operator": { "type": "string", "operation": "equals" } }],
+          "combinator": "and"
+        }
+      },
+      "id": "if-method", "name": "🔀 TOGGLE: API or Buffer?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [560, 850]
+    },
+    {
+      "parameters": {
+        "jsCode": "const row=$('🔄 Publish Each').first().json;\nconst cfg=$('⚙️ CONTROL PANEL').first().json;\nconst plat=row.platform||cfg.platform;\n// pick Buffer profile ids based on selected platform\nconst profiles=[];\nif(plat==='youtube'||plat==='both'){ if($vars.BUFFER_PROFILE_ID_YOUTUBE) profiles.push($vars.BUFFER_PROFILE_ID_YOUTUBE); }\nif(plat==='tiktok'||plat==='both'){ if($vars.BUFFER_PROFILE_ID_TIKTOK) profiles.push($vars.BUFFER_PROFILE_ID_TIKTOK); }\nconst text=(row.title||'')+'\\n\\n'+(row.description||'')+'\\n\\n'+(row.hashtags||'');\n// build x-www-form-urlencoded body with repeated profile_ids[]\nconst parts=[];\nprofiles.forEach(p=>parts.push('profile_ids[]='+encodeURIComponent(p)));\nparts.push('text='+encodeURIComponent(text));\nparts.push('media[video]='+encodeURIComponent(row.video_url||''));\nparts.push('media[thumbnail]='+encodeURIComponent(row.thumbnail_url||''));\nparts.push('now=true');\nreturn [{ json:{ id:row.id, _profilesCount:profiles.length, bufferBody:parts.join('&') } }];"
+      },
+      "id": "build-buffer", "name": "📝 Build Buffer Post",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [780, 1130]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.bufferapp.com/1/updates/create.json?access_token={{ $vars.BUFFER_ACCESS_TOKEN }}",
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/x-www-form-urlencoded",
+        "body": "={{ $json.bufferBody }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "buffer-post", "name": "📱 Buffer: Post Video",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1000, 1130]
+    },
+    {
+      "parameters": {
+        "jsCode": "const row=$('🔄 Publish Each').first().json;\nconst resp=$input.first().json;\nconst ok = resp.success || (resp.updates && resp.updates.length>0);\nconst pid = (resp.updates && resp.updates[0] && resp.updates[0].id) || null;\nreturn [{ json:{ id:row.id, status: ok?'published':'failed', platform:'buffer', youtube_video_id:null, tiktok_video_id:pid, published_at: ok?new Date().toISOString():null, error_notes: ok?null:('Buffer post failed: '+JSON.stringify(resp).slice(0,200)) } }];"
+      },
+      "id": "buffer-result", "name": "📋 Buffer Result",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1220, 1130]
+    },
+    {
+      "parameters": {
         "rules": { "values": [
           { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "yt", "leftValue": "={{ $json.platform }}", "rightValue": "youtube", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "youtube" },
           { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "tt", "leftValue": "={{ $json.platform }}", "rightValue": "tiktok", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "tiktok" },
@@ -641,7 +678,14 @@
 
     "💾 Supabase: Get Due Videos":  { "main": [[{ "node": "📋 Split Due",                 "type": "main", "index": 0 }]] },
     "📋 Split Due":                 { "main": [[{ "node": "🔄 Publish Each",              "type": "main", "index": 0 }]] },
-    "🔄 Publish Each":              { "main": [[{ "node": "🔀 TOGGLE: Platform",          "type": "main", "index": 0 }]] },
+    "🔄 Publish Each":              { "main": [[{ "node": "🔀 TOGGLE: API or Buffer?",    "type": "main", "index": 0 }]] },
+    "🔀 TOGGLE: API or Buffer?": { "main": [
+      [{ "node": "📝 Build Buffer Post",  "type": "main", "index": 0 }],
+      [{ "node": "🔀 TOGGLE: Platform",   "type": "main", "index": 0 }]
+    ]},
+    "📝 Build Buffer Post":         { "main": [[{ "node": "📱 Buffer: Post Video",        "type": "main", "index": 0 }]] },
+    "📱 Buffer: Post Video":        { "main": [[{ "node": "📋 Buffer Result",             "type": "main", "index": 0 }]] },
+    "📋 Buffer Result":             { "main": [[{ "node": "💾 Supabase: Mark Published",  "type": "main", "index": 0 }]] },
     "🔀 TOGGLE: Platform": { "main": [
       [{ "node": "⬇️ Download Video",  "type": "main", "index": 0 }],
       [{ "node": "🎵 TikTok: Publish", "type": "main", "index": 0 }],
