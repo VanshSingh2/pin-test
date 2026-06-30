@@ -5,7 +5,8 @@ This repo contains **two** all-in-one n8n automation workflows, both backed by *
 | Workflow | File | What it does |
 |----------|------|--------------|
 | 📌 **Pinterest** | `workflows/pinterest_ai_complete.json` | Trends → ideas → DALL-E images → SEO copy → post (Pinterest API **or** Buffer toggle) |
-| 🎬 **YouTube + TikTok** | `workflows/youtube_tiktok_v4_ondemand_openrouter.json` | ⭐ **v4** — on-demand Telegram bot, OpenRouter image→video, Script Writer + Doctor |
+| 🎬 **YouTube + TikTok** | `workflows/youtube_tiktok_v5_smart.json` | ⭐ **v5 smart** — conversational, niche+style, **Pinterest/Pexels clip b-roll**, Buffer |
+| 📌 **Pinterest** | `workflows/pinterest_v2_smart.json` | **Smart** conversational pin maker (niche+style, propose→confirm) |
 | 📸 **Instagram** | `workflows/instagram_v1_telegram.json` | Conversational bot — set niche+style, then make carousel / image / Reel, Buffer posting |
 
 Jump to: [Pinterest](#-pinterest-automation) · [YouTube + TikTok](#-youtube--tiktok-automation)
@@ -395,4 +396,30 @@ bot: ✅ Carousel created! [slide URLs]
 workflows/instagram_v1_telegram.json    ← the conversational Instagram workflow
 config/instagram_supabase_schema.sql     ← ig_state (niche/style/pending) + ig_queue
 config/instagram_setup.md                ← full setup + commands
+```
+
+
+---
+
+## 🧠 Smart Conversational YouTube & Pinterest (+ Pinterest clip b-roll)
+
+Both now work like the Instagram bot — a **Manager Brain** chats with you, **proposes a plan and waits for your "yes"**, and remembers a **niche + style** per chat. Full guide: [`config/smart_workflows_setup.md`](config/smart_workflows_setup.md). Run [`config/smart_state_schema.sql`](config/smart_state_schema.sql) first.
+
+### 🎬 `youtube_tiktok_v5_smart.json` — clips b-roll
+- Set niche, style, **b-roll source** (`pexels` or `pinterest`), a **reference clip style**, and platform — all by chatting
+- Per scene it fetches a clip: **Pexels** (safe, default) or **Pinterest** (scrapes video pins for the script keyword / your reference phrase)
+- FFmpeg stitches clips + TTS voice + captions → posts via Buffer
+
+### 📌 `pinterest_v2_smart.json` — conversational pins
+- "set niche…", "style…", "make a pin about…" → proposes → you confirm → AI image + SEO copy → posts to Pinterest
+
+### ⚠️ Honest note on Pinterest clips
+There's **no official API** to download Pinterest video pins, so the YouTube workflow **scrapes** the search page — it can break when Pinterest changes their site and may breach their ToS, and the clips are **copyrighted by others** (repost risk). **Pexels is the safe default**; treat Pinterest clip mode as experimental.
+
+### Files
+```
+workflows/youtube_tiktok_v5_smart.json   ← smart YT/TikTok + Pinterest/Pexels clip b-roll
+workflows/pinterest_v2_smart.json        ← smart conversational pin maker
+config/smart_state_schema.sql            ← yt_state + pin_state tables
+config/smart_workflows_setup.md          ← full setup + commands
 ```
