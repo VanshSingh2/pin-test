@@ -2,6 +2,8 @@
 
 This repo contains **two** all-in-one n8n automation workflows, both backed by **Supabase**:
 
+> 🎯 **NEW — `workflows/creative_director_v1.json`:** one conversational Telegram bot for **all platforms** (Instagram, YouTube, TikTok, Pinterest). Chat to set niche + style + visual source (AI / Pexels / Pinterest clips) + AI model + posting (Buffer/API); it generates a **master creative brief**, remembers your **brand bible** so everything stays consistent, and makes **images, carousels, or videos** on confirmation. See [`config/creative_director_setup.md`](config/creative_director_setup.md).
+
 | Workflow | File | What it does |
 |----------|------|--------------|
 | 📌 **Pinterest** | `workflows/pinterest_ai_complete.json` | Trends → ideas → DALL-E images → SEO copy → post (Pinterest API **or** Buffer toggle) |

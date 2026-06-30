@@ -1,0 +1,640 @@
+{
+  "name": "🎯 Creative Director — Unified Conversational Studio (All Platforms)",
+  "nodes": [
+    {
+      "parameters": { "updates": ["message"], "additionalFields": {} },
+      "id": "cd-trigger", "name": "💬 Telegram Command",
+      "type": "n8n-nodes-base.telegramTrigger", "typeVersion": 1.2, "position": [-700, 500],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const msg=$input.first().json.message||{};\nreturn [{ json:{ chatId:String((msg.chat&&msg.chat.id)||''), text:(msg.text||'').trim() } }];"
+      },
+      "id": "cd-intake", "name": "🧠 Intake",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-480, 500]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_state?chat_id=eq.{{ $json.chatId }}&select=*",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-load", "name": "💾 Load Brand State",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-260, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const intake=$('🧠 Intake').first().json;\nconst rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nconst s=rows[0]||{};\nconst d={ niche:s.niche||'', style:s.style||'', platform:s.platform||'instagram', content_type:s.content_type||'video', visual_source:s.visual_source||'ai', image_model:s.image_model||'openai/gpt-image-1', video_model:s.video_model||'google/veo-3.1-lite', posting_method:s.posting_method||'buffer', reference:s.reference||'', brand_bible:s.brand_bible||'', pending:s.pending_action||null };\nconst sys=`You are a world-class Creative Director running a multi-platform content studio for one creator. You chat naturally, keep everything ON-BRAND using the brand memory, and ALWAYS CONFIRM before creating.\\n\\nCurrent settings:\\n- niche: \\\"${d.niche||'(not set)'}\\\"\\n- style: \\\"${d.style||'(not set)'}\\\"\\n- platform: ${d.platform}\\n- content_type: ${d.content_type}\\n- visual_source: ${d.visual_source} (ai = AI-generated visuals; pexels/pinterest = real clips)\\n- image_model: ${d.image_model}\\n- video_model: ${d.video_model}\\n- posting_method: ${d.posting_method} (buffer or api)\\n- reference (clip search phrase): \\\"${d.reference||'(none)'}\\\"\\n- BRAND BIBLE (keep new work consistent with this): \\\"${d.brand_bible||'(empty — first creation)'}\\\"\\n- pending action: ${d.pending?JSON.stringify(d.pending):'(none)'}\\n\\nYou understand free-form requests. The user can set any of: niche, style, platform, content_type (image|carousel|video), visual_source (ai|pexels|pinterest), image_model, video_model, posting_method (buffer|api), reference. They can also paste a SCRIPT to use, or ask you to decide as the specialist.\\n\\nRules:\\n- If they change any setting => intent=set_config and fill the matching set_* fields (only the ones mentioned).\\n- If they ask to CREATE => intent=propose. Fill action {content_type, platform, topic, script, slide_count, visual_source, posting_method}. Use current settings as defaults; if they didn't specify posting method, you MAY ask in the reply (e.g. 'post via Buffer or API?'). Write a short plan and ask them to reply 'yes'.\\n- Confirm (yes/go/make it) with a pending action => intent=confirm.\\n- cancel => intent=cancel. Else intent=chat.\\n- If niche or style is missing when creating, ask them to set it first (intent=chat).\\nRespond STRICT JSON only.`;\nconst usr=`User: \\\"${intake.text}\\\"\\nReturn JSON: {\\n \\\"reply\\\":\\\"natural reply\\\",\\n \\\"intent\\\":\\\"set_config|propose|confirm|cancel|chat\\\",\\n \\\"set_niche\\\":\\\"\\\",\\\"set_style\\\":\\\"\\\",\\\"set_platform\\\":\\\"\\\",\\\"set_content_type\\\":\\\"\\\",\\\"set_visual_source\\\":\\\"\\\",\\\"set_image_model\\\":\\\"\\\",\\\"set_video_model\\\":\\\"\\\",\\\"set_posting_method\\\":\\\"\\\",\\\"set_reference\\\":\\\"\\\",\\n \\\"content_type\\\":\\\"\\\",\\\"platform\\\":\\\"\\\",\\\"topic\\\":\\\"\\\",\\\"script\\\":\\\"\\\",\\\"slide_count\\\":5,\\\"visual_source\\\":\\\"\\\",\\\"posting_method\\\":\\\"\\\"\\n}`;\nreturn [{ json:{ chatId:intake.chatId, d, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:900 } } }];"
+      },
+      "id": "cd-brain-build", "name": "🧠 Director Brain Prompt",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-40, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-brain-ai", "name": "🤖 OpenRouter: Director",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [180, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx=$('🧠 Director Brain Prompt').first().json;const d=ctx.d;const p=d.pending||{};\nlet o={};try{o=JSON.parse($input.first().json.choices[0].message.content);}catch(e){const mm=((($input.first().json.choices||[{}])[0].message||{}).content||'').match(/\\{[\\s\\S]*\\}/);if(mm)o=JSON.parse(mm[0]);}\nconst pick=(a,b,c)=>a||b||c||'';\nreturn [{ json:{\n  chatId:ctx.chatId, reply:o.reply||'On it!', intent:o.intent||'chat',\n  niche:d.niche, style:d.style, brand_bible:d.brand_bible,\n  set_niche:o.set_niche||'', set_style:o.set_style||'', set_platform:o.set_platform||'', set_content_type:o.set_content_type||'', set_visual_source:o.set_visual_source||'', set_image_model:o.set_image_model||'', set_video_model:o.set_video_model||'', set_posting_method:o.set_posting_method||'', set_reference:o.set_reference||'',\n  platform: pick(o.platform, p.platform, d.platform),\n  content_type: pick(o.content_type, p.content_type, d.content_type),\n  visual_source: pick(o.visual_source, p.visual_source, d.visual_source),\n  posting_method: pick(o.posting_method, p.posting_method, d.posting_method),\n  image_model:d.image_model, video_model:d.video_model, reference:d.reference,\n  topic: pick(o.topic, p.topic, ''), script: pick(o.script, p.script, ''),\n  slide_count: Number(o.slide_count||p.slide_count||5)\n} }];"
+      },
+      "id": "cd-brain-parse", "name": "📋 Parse Director",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [400, 500]
+    },
+    {
+      "parameters": {
+        "rules": { "values": [
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "sc", "leftValue": "={{ $json.intent }}", "rightValue": "set_config", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "set_config" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "pr", "leftValue": "={{ $json.intent }}", "rightValue": "propose", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "propose" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "cf", "leftValue": "={{ $json.intent }}", "rightValue": "confirm", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "confirm" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "cn", "leftValue": "={{ $json.intent }}", "rightValue": "cancel", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "cancel" }
+        ]}, "options": { "fallbackOutput": "extra" }
+      },
+      "id": "cd-route", "name": "🔀 Route Intent",
+      "type": "n8n-nodes-base.switch", "typeVersion": 3, "position": [620, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_state?on_conflict=chat_id",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "resolution=merge-duplicates" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id:$json.chatId, niche:($json.set_niche||$json.niche||''), style:($json.set_style||$json.style||''), platform:($json.set_platform||$json.platform||'instagram'), content_type:($json.set_content_type||$json.content_type||'video'), visual_source:($json.set_visual_source||$json.visual_source||'ai'), image_model:($json.set_image_model||$json.image_model||'openai/gpt-image-1'), video_model:($json.set_video_model||$json.video_model||'google/veo-3.1-lite'), posting_method:($json.set_posting_method||$json.posting_method||'buffer'), reference:($json.set_reference||$json.reference||''), updated_at:$now.toISO() }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-save-config", "name": "💾 Save Settings",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [900, 160]
+    },
+    {
+      "parameters": { "chatId": "={{ $('📋 Parse Director').first().json.chatId }}", "text": "={{ $('📋 Parse Director').first().json.reply }}", "additionalFields": {} },
+      "id": "cd-reply-config", "name": "💬 Reply: Config",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [1120, 160],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_state?on_conflict=chat_id",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "resolution=merge-duplicates" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id:$json.chatId, pending_action:{ content_type:$json.content_type, platform:$json.platform, topic:$json.topic, script:$json.script, slide_count:$json.slide_count, visual_source:$json.visual_source, posting_method:$json.posting_method }, updated_at:$now.toISO() }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-save-pending", "name": "💾 Save Pending",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [900, 340]
+    },
+    {
+      "parameters": { "chatId": "={{ $('📋 Parse Director').first().json.chatId }}", "text": "={{ $('📋 Parse Director').first().json.reply }}", "additionalFields": {} },
+      "id": "cd-reply-propose", "name": "💬 Reply: Proposal",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [1120, 340],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_state?on_conflict=chat_id",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "resolution=merge-duplicates" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id:$json.chatId, pending_action:null, updated_at:$now.toISO() }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-clear-pending", "name": "💾 Clear Pending",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [900, 520]
+    },
+    {
+      "parameters": { "chatId": "={{ $('📋 Parse Director').first().json.chatId }}", "text": "={{ $('📋 Parse Director').first().json.reply }}", "additionalFields": {} },
+      "id": "cd-reply-cancel", "name": "💬 Reply: Cancelled",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [1120, 520],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": { "chatId": "={{ $('📋 Parse Director').first().json.chatId }}", "text": "={{ $('📋 Parse Director').first().json.reply }}", "additionalFields": {} },
+      "id": "cd-reply-chat", "name": "💬 Reply: Chat",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [900, 700],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const m=$json;\nconst job='cd_'+Date.now();\nconst sys=`You are the Creative Director producing a MASTER CREATIVE BRIEF that downstream image AND video generators will follow EXACTLY. Maintain visual consistency with the existing brand bible. Respond STRICT JSON only.`;\nconst usr=`Niche: ${m.niche}\\nStyle: ${m.style}\\nPlatform: ${m.platform}\\nContent type: ${m.content_type}\\nVisual source: ${m.visual_source}\\nExisting brand bible (stay consistent with this): \\\"${m.brand_bible||'(none yet — establish it)'}\\\"\\nTopic: ${m.topic}\\nProvided script (may be empty): \\\"${m.script||''}\\\"\\nSlide count (carousel): ${m.slide_count}\\n\\nReturn JSON:\\n{\\n \\\"style_bible\\\": \\\"1-2 sentences locking palette, lighting, mood, composition, recurring motifs, font feel — reusable for every asset\\\",\\n \\\"updated_brand_bible\\\": \\\"the evolved brand bible to remember for next time (<= 320 chars)\\\",\\n \\\"caption\\\": \\\"platform-ready caption with hook + CTA + relevant hashtags\\\",\\n \\\"title\\\": \\\"<=90 char title (for video/pin)\\\",\\n \\\"hashtags\\\": \\\"space-separated #tags\\\",\\n \\\"image_prompt\\\": \\\"single hero image prompt (for image content)\\\",\\n \\\"slides\\\": [{\\\"headline\\\":\\\"\\\",\\\"image_prompt\\\":\\\"\\\"}],\\n \\\"scenes\\\": [{\\\"narration\\\":\\\"\\\",\\\"on_screen_text\\\":\\\"<=6 words\\\",\\\"image_prompt\\\":\\\"still-frame, vertical 9:16\\\",\\\"motion_prompt\\\":\\\"camera/subject motion\\\",\\\"broll_keyword\\\":\\\"clip search term\\\"}]\\n}\\nEvery image_prompt MUST embed the style so all assets look cohesive. For video provide 4 scenes; for carousel provide ${m.slide_count} slides.`;\nreturn [{ json:{ ...m, job, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.8, max_tokens:2000 } } }];"
+      },
+      "id": "cd-brief-build", "name": "🎯 Master Brief Prompt",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [900, 880]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-brief-ai", "name": "🤖 OpenRouter: Master Brief",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1120, 880]
+    },
+    {
+      "parameters": {
+        "jsCode": "const m=$('🎯 Master Brief Prompt').first().json;\nlet o={};try{o=JSON.parse($input.first().json.choices[0].message.content);}catch(e){const mm=((($input.first().json.choices||[{}])[0].message||{}).content||'').match(/\\{[\\s\\S]*\\}/);if(mm)o=JSON.parse(mm[0]);}\nconst styleBible=o.style_bible||m.style;\nconst styleSuffix=`. Style: ${m.style}. ${styleBible}`;\nreturn [{ json:{\n  chatId:m.chatId, job:m.job, niche:m.niche, style:m.style, platform:m.platform, content_type:m.content_type, visual_source:m.visual_source, image_model:m.image_model, posting_method:m.posting_method, reference:m.reference, topic:m.topic,\n  style_bible:styleBible, style_suffix:styleSuffix, updated_brand_bible:(o.updated_brand_bible||m.brand_bible||styleBible).slice(0,320),\n  caption:o.caption||m.topic, title:(o.title||m.topic||'').slice(0,95), hashtags:o.hashtags||'',\n  image_prompt:o.image_prompt||m.topic,\n  slides:(o.slides||[]).slice(0,m.slide_count||5),\n  scenes:(o.scenes||[]).slice(0,6)\n} }];"
+      },
+      "id": "cd-brief-parse", "name": "📋 Parse Brief",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1340, 880]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_state?on_conflict=chat_id",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "resolution=merge-duplicates" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id:$json.chatId, brand_bible:$json.updated_brand_bible, pending_action:null, updated_at:$now.toISO() }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-save-bible", "name": "🧠 Update Brand Memory",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1560, 880]
+    },
+    {
+      "parameters": {
+        "rules": { "values": [
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "im", "leftValue": "={{ $('📋 Parse Brief').first().json.content_type }}", "rightValue": "image", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "image" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "ca", "leftValue": "={{ $('📋 Parse Brief').first().json.content_type }}", "rightValue": "carousel", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "carousel" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "vi", "leftValue": "={{ $('📋 Parse Brief').first().json.content_type }}", "rightValue": "video", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "video" }
+        ]}, "options": {}
+      },
+      "id": "cd-content-switch", "name": "🔀 Content Type",
+      "type": "n8n-nodes-base.switch", "typeVersion": 3, "position": [1780, 880]
+    },
+
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: ($('📋 Parse Brief').first().json.image_model||'openai/gpt-image-1'), modalities:['image','text'], messages:[{ role:'user', content: ('Vertical image, no text in the image. '+$('📋 Parse Brief').first().json.image_prompt + $('📋 Parse Brief').first().json.style_suffix) }] }) }}",
+        "options": { "timeout": 120000, "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-img-gen", "name": "🎨 Image: Generate",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2060, 540]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b=$('📋 Parse Brief').first().json;\nconst resp=$json;let x='';\ntry{ const msg=resp.choices&&resp.choices[0]&&resp.choices[0].message; if(msg&&msg.images&&msg.images[0]){ const u=msg.images[0].image_url?msg.images[0].image_url.url:msg.images[0].url; x=(u||'').split(',').pop(); } else if(resp.data&&resp.data[0]&&resp.data[0].b64_json){ x=resp.data[0].b64_json; } }catch(e){}\nreturn [{ json:{ ...b, img_b64:x } }];"
+      },
+      "id": "cd-img-extract", "name": "🖼️ Image: Extract",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2280, 540]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.imgbb.com/1/upload",
+        "sendBody": true, "contentType": "form-urlencoded",
+        "bodyParameters": { "parameters": [
+          { "name": "key", "value": "={{ $vars.IMGBB_API_KEY }}" },
+          { "name": "image", "value": "={{ $json.img_b64 }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-img-host", "name": "☁️ Image: Host",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2500, 540]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b=$('📋 Parse Brief').first().json;\nlet url='';try{url=$json.data.display_url||$json.data.url;}catch(e){}\nreturn [{ json:{ chatId:b.chatId, job:b.job, kind:'image', platform:b.platform, posting_method:b.posting_method, niche:b.niche, style:b.style, topic:b.topic, caption:b.caption, title:b.title, hashtags:b.hashtags, media_urls:[url], media_url:url, video_url:'' } }];"
+      },
+      "id": "cd-img-done", "name": "📦 Image: Package",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2720, 540]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b=$('📋 Parse Brief').first().json;\nconst slides=(b.slides&&b.slides.length?b.slides:[{image_prompt:b.image_prompt}]);\nreturn slides.map((s,i)=>({ json:{ chatId:b.chatId, job:b.job, platform:b.platform, posting_method:b.posting_method, image_model:b.image_model, niche:b.niche, style:b.style, topic:b.topic, caption:b.caption, title:b.title, hashtags:b.hashtags, style_suffix:b.style_suffix, idx:i, headline:s.headline||'', image_prompt:(s.image_prompt||b.image_prompt) } }));"
+      },
+      "id": "cd-car-split", "name": "🗂️ Carousel: Split Slides",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2060, 760]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: ($json.image_model||'openai/gpt-image-1'), modalities:['image','text'], messages:[{ role:'user', content: ('Vertical 4:5 carousel slide image, no text in the image. '+$json.image_prompt + $json.style_suffix) }] }) }}",
+        "options": { "timeout": 120000, "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-car-img", "name": "🎨 Carousel: Slide Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2280, 760]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base=$('🗂️ Carousel: Split Slides').item.json;\nconst resp=$json;let x='';\ntry{ const msg=resp.choices&&resp.choices[0]&&resp.choices[0].message; if(msg&&msg.images&&msg.images[0]){ const u=msg.images[0].image_url?msg.images[0].image_url.url:msg.images[0].url; x=(u||'').split(',').pop(); } else if(resp.data&&resp.data[0]&&resp.data[0].b64_json){ x=resp.data[0].b64_json; } }catch(e){}\nreturn [{ json:{ ...base, img_b64:x } }];"
+      },
+      "id": "cd-car-extract", "name": "🖼️ Carousel: Extract",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2500, 760]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.imgbb.com/1/upload",
+        "sendBody": true, "contentType": "form-urlencoded",
+        "bodyParameters": { "parameters": [
+          { "name": "key", "value": "={{ $vars.IMGBB_API_KEY }}" },
+          { "name": "image", "value": "={{ $json.img_b64 }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-car-host", "name": "☁️ Carousel: Host Slide",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2720, 760]
+    },
+    {
+      "parameters": {
+        "jsCode": "const slides=$('🗂️ Carousel: Split Slides').all().map(i=>i.json);\nconst hosts=$input.all().map(i=>i.json);\nconst b=$('📋 Parse Brief').first().json;\nconst urls=hosts.map(h=>{ try{return h.data.display_url||h.data.url;}catch(e){return '';} }).filter(Boolean);\nreturn [{ json:{ chatId:b.chatId, job:b.job, kind:'carousel', platform:b.platform, posting_method:b.posting_method, niche:b.niche, style:b.style, topic:b.topic, caption:b.caption, title:b.title, hashtags:b.hashtags, media_urls:urls, media_url:urls[0]||'', video_url:'' } }];"
+      },
+      "id": "cd-car-done", "name": "📦 Carousel: Package",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2940, 760]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const b=$('📋 Parse Brief').first().json;\nconst scenes=(b.scenes&&b.scenes.length?b.scenes:[{narration:b.topic,on_screen_text:b.title,image_prompt:b.image_prompt,broll_keyword:b.topic,motion_prompt:'slow push-in'}]);\nreturn scenes.map((s,i)=>({ json:{ chatId:b.chatId, job:b.job, platform:b.platform, posting_method:b.posting_method, niche:b.niche, style:b.style, topic:b.topic, caption:b.caption, title:b.title, hashtags:b.hashtags, visual_source:b.visual_source, image_model:b.image_model, style_suffix:b.style_suffix, idx:i, narration:s.narration||'', on_screen_text:s.on_screen_text||'', image_prompt:(s.image_prompt||b.image_prompt), query:(b.reference?b.reference:(s.broll_keyword||b.topic)) } }));"
+      },
+      "id": "cd-vid-split", "name": "🎬 Video: Split Scenes",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2060, 1040]
+    },
+    {
+      "parameters": {
+        "rules": { "values": [
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "ai", "leftValue": "={{ $json.visual_source }}", "rightValue": "ai", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "ai" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "px", "leftValue": "={{ $json.visual_source }}", "rightValue": "pexels", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "pexels" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "pn", "leftValue": "={{ $json.visual_source }}", "rightValue": "pinterest", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "pinterest" }
+        ]}, "options": { "fallbackOutput": "extra" }
+      },
+      "id": "cd-vsrc-switch", "name": "🔀 Visual Source",
+      "type": "n8n-nodes-base.switch", "typeVersion": 3, "position": [2280, 1040]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: ($json.image_model||'openai/gpt-image-1'), modalities:['image','text'], messages:[{ role:'user', content: ('Vertical 9:16 still, no text in the image. '+$json.image_prompt+$json.style_suffix) }] }) }}",
+        "options": { "timeout": 120000, "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-vid-aiimg", "name": "🎨 Scene: AI Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2520, 880]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base=$('🎬 Video: Split Scenes').item.json;\nconst resp=$json;let x='';\ntry{ const msg=resp.choices&&resp.choices[0]&&resp.choices[0].message; if(msg&&msg.images&&msg.images[0]){ const u=msg.images[0].image_url?msg.images[0].image_url.url:msg.images[0].url; x=(u||'').split(',').pop(); } else if(resp.data&&resp.data[0]&&resp.data[0].b64_json){ x=resp.data[0].b64_json; } }catch(e){}\nreturn [{ json:{ ...base, img_b64:x } }];"
+      },
+      "id": "cd-vid-aiextract", "name": "🖼️ Scene: Extract AI",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2740, 880]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.imgbb.com/1/upload",
+        "sendBody": true, "contentType": "form-urlencoded",
+        "bodyParameters": { "parameters": [
+          { "name": "key", "value": "={{ $vars.IMGBB_API_KEY }}" },
+          { "name": "image", "value": "={{ $json.img_b64 }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-vid-aihost", "name": "☁️ Scene: Host AI",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2960, 880]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base=$('🖼️ Scene: Extract AI').item.json;\nlet url='';try{url=$json.data.display_url||$json.data.url;}catch(e){}\nreturn [{ json:{ idx:base.idx, narration:base.narration, on_screen_text:base.on_screen_text, image_url:url, clip_url:'' } }];"
+      },
+      "id": "cd-vid-aidone", "name": "📋 Scene: AI Ready",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3180, 880]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.pexels.com/videos/search?query={{ encodeURIComponent($json.query) }}&per_page=1&orientation=portrait&size=medium",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "={{ $vars.PEXELS_API_KEY }}" }] },
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-vid-pex", "name": "📷 Scene: Pexels Clip",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2520, 1060]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base=$('🎬 Video: Split Scenes').item.json;\nconst r=$json;let url='';\ntry{ const v=r.videos||[]; if(v.length){ const f=v[0].video_files||[]; const port=f.filter(x=>x.height>=x.width); const pool=port.length?port:f; pool.sort((a,b)=>(b.height||0)-(a.height||0)); url=(pool[0]||{}).link||''; } }catch(e){}\nreturn [{ json:{ idx:base.idx, narration:base.narration, on_screen_text:base.on_screen_text, image_url:'', clip_url:url } }];"
+      },
+      "id": "cd-vid-pexdone", "name": "📋 Scene: Pexels Ready",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2740, 1060]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.pinterest.com/search/pins/?q={{ encodeURIComponent($json.query) }}&rs=typed",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "User-Agent", "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" },
+          { "name": "Accept", "value": "text/html,application/xhtml+xml" }
+        ]},
+        "options": { "response": { "response": { "responseFormat": "text", "neverError": true } } }
+      },
+      "id": "cd-vid-pin", "name": "📌 Scene: Pinterest Clip",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2520, 1240]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base=$('🎬 Video: Split Scenes').item.json;\nlet html=$json.data; if(typeof html!=='string') html=JSON.stringify($json);\nconst re=/https:\\/\\/v[0-9a-z]*\\.pinimg\\.com\\/[^\\\"\\\\ ]+\\.mp4/g;\nconst found=[...new Set((html.match(re)||[]))];\nfound.sort((a,b)=>((b.includes('720')?1:0)-(a.includes('720')?1:0)));\nreturn [{ json:{ idx:base.idx, narration:base.narration, on_screen_text:base.on_screen_text, image_url:'', clip_url:found[0]||'' } }];"
+      },
+      "id": "cd-vid-pindone", "name": "📋 Scene: Pinterest Ready",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2740, 1240]
+    },
+    {
+      "parameters": {
+        "jsCode": "// run once: collect all scenes (any source), sort, build FFmpeg\nconst items=$input.all().map(i=>i.json);\nitems.sort((a,b)=>(a.idx||0)-(b.idx||0));\nconst b=$('📋 Parse Brief').first().json;\nconst KEY=$vars.OPENAI_API_KEY;\nconst FONT=$vars.FFMPEG_FONT||'/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';\nconst voice=$vars.OPENAI_TTS_VOICE||'onyx';\nconst dir='/tmp/'+b.job;const b64=(s)=>Buffer.from(String(s||''),'utf8').toString('base64');\nconst L=['set -e','export DIR='+dir,'mkdir -p $DIR','cd $DIR'];const list=[];\nitems.forEach((s,i)=>{\n  const tts=JSON.stringify({model:'tts-1-hd',voice:voice,input:s.narration||b.topic});\n  L.push(`echo \\\"${b64(tts)}\\\" | base64 -d > tts_${i}.json`);\n  L.push(`curl -s https://api.openai.com/v1/audio/speech -H \\\"Authorization: Bearer ${KEY}\\\" -H \\\"Content-Type: application/json\\\" --data @tts_${i}.json -o voice_${i}.mp3`);\n  L.push(`echo \\\"${b64(s.on_screen_text)}\\\" | base64 -d > cap_${i}.txt`);\n  L.push(`D=$(ffprobe -v error -show_entries format=duration -of csv=p=0 voice_${i}.mp3)`);\n  const vf=`scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,drawtext=fontfile=${FONT}:textfile=cap_${i}.txt:fontcolor=white:fontsize=64:box=1:boxcolor=black@0.55:boxborderw=26:x=(w-text_w)/2:y=h-560`;\n  let input;\n  if(s.image_url){ L.push(`curl -sL \\\"${s.image_url}\\\" -o src_${i}.jpg || true`); input=`-loop 1 -t $D -i src_${i}.jpg`; }\n  else if(s.clip_url){ L.push(`curl -sL \\\"${s.clip_url}\\\" -o src_${i}.mp4 || true`); input=`-stream_loop -1 -t $D -i src_${i}.mp4`; }\n  else { input=`-f lavfi -t $D -i color=c=0x111418:s=1080x1920`; }\n  L.push(`ffmpeg -y ${input} -i voice_${i}.mp3 -vf \\\"${vf}\\\" -map 0:v -map 1:a -r 30 -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -shortest scene_${i}.mp4`);\n  list.push(`file 'scene_${i}.mp4'`);\n});\nL.push(`printf \\\"${list.join('\\\\n')}\\\\n\\\" > list.txt`);\nL.push(`ffmpeg -y -f concat -safe 0 -i list.txt -c copy ${dir}/final.mp4`);\nL.push(`echo DONE ${dir}/final.mp4`);\nreturn [{ json:{ chatId:b.chatId, job:b.job, platform:b.platform, posting_method:b.posting_method, niche:b.niche, style:b.style, topic:b.topic, caption:b.caption, title:b.title, hashtags:b.hashtags, outPath:dir+'/final.mp4', ffmpegScript:L.join('\\n') } }];"
+      },
+      "id": "cd-vid-collect", "name": "🎞️ Video: Build FFmpeg",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3400, 1040]
+    },
+    {
+      "parameters": { "command": "={{ $json.ffmpegScript }}" },
+      "id": "cd-vid-exec", "name": "🖥️ Video: Render",
+      "type": "n8n-nodes-base.executeCommand", "typeVersion": 1, "position": [3620, 1040]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ $('🎞️ Video: Build FFmpeg').first().json.outPath }}",
+        "options": { "dataPropertyName": "data" }
+      },
+      "id": "cd-vid-read", "name": "📂 Video: Read MP4",
+      "type": "n8n-nodes-base.readWriteFile", "typeVersion": 1, "position": [3840, 1040]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL }}/storage/v1/object/videos/{{ $('🎞️ Video: Build FFmpeg').first().json.job }}.mp4",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "video/mp4" },
+          { "name": "x-upsert", "value": "true" }
+        ]},
+        "sendBody": true, "contentType": "binaryData", "inputDataFieldName": "data",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-vid-upload", "name": "☁️ Video: Upload Storage",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [4060, 1040]
+    },
+    {
+      "parameters": {
+        "jsCode": "const m=$('🎞️ Video: Build FFmpeg').first().json;\nconst publicUrl=`${$vars.SUPABASE_URL}/storage/v1/object/public/videos/${m.job}.mp4`;\nreturn [{ json:{ chatId:m.chatId, job:m.job, kind:'video', platform:m.platform, posting_method:m.posting_method, niche:m.niche, style:m.style, topic:m.topic, caption:m.caption, title:m.title, hashtags:m.hashtags, media_urls:[publicUrl], media_url:'', video_url:publicUrl } }];"
+      },
+      "id": "cd-vid-package", "name": "📦 Video: Package",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [4280, 1040]
+    },
+
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "pm", "leftValue": "={{ $json.posting_method }}", "rightValue": "buffer", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }
+      },
+      "id": "cd-post-switch", "name": "🔀 Posting Method?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [4560, 880]
+    },
+    {
+      "parameters": {
+        "jsCode": "const m=$json;\nconst map={ instagram:$vars.BUFFER_PROFILE_ID_INSTAGRAM, youtube:$vars.BUFFER_PROFILE_ID_YOUTUBE, tiktok:$vars.BUFFER_PROFILE_ID_TIKTOK, pinterest:$vars.BUFFER_PROFILE_ID_PINTEREST };\nlet profiles = m.platform==='both' ? [map.instagram,map.youtube,map.tiktok].filter(Boolean) : [map[m.platform]].filter(Boolean);\nconst parts=[];profiles.forEach(p=>parts.push('profile_ids[]='+encodeURIComponent(p)));\nparts.push('text='+encodeURIComponent((m.caption||m.topic)));\nif(m.video_url) parts.push('media[video]='+encodeURIComponent(m.video_url));\nelse if(m.media_url) parts.push('media[photo]='+encodeURIComponent(m.media_url));\nparts.push('now=true');\nreturn [{ json:{ ...m, bufferBody:parts.join('&') } }];"
+      },
+      "id": "cd-buffer-build", "name": "📝 Buffer: Build Post",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [4780, 720]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.bufferapp.com/1/updates/create.json?access_token={{ $vars.BUFFER_ACCESS_TOKEN }}",
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/x-www-form-urlencoded",
+        "body": "={{ $json.bufferBody }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-buffer-post", "name": "📱 Buffer: Post",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [5000, 720]
+    },
+    {
+      "parameters": {
+        "jsCode": "const m=$('📝 Buffer: Build Post').first().json;\nreturn [{ json:{ chatId:m.chatId, kind:m.kind, platform:m.platform, topic:m.topic, style:m.style, caption:m.caption, media_urls:m.media_urls, visual_source:m.visual_source||'', link:'Queued in Buffer ('+m.platform+')' } }];"
+      },
+      "id": "cd-result-buffer", "name": "📋 Result: Buffer",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5220, 720]
+    },
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "vid", "leftValue": "={{ $json.kind }}", "rightValue": "video", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }
+      },
+      "id": "cd-api-switch", "name": "🔀 API: Video or Pin?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [4780, 1040]
+    },
+    {
+      "parameters": { "url": "={{ $json.video_url }}", "options": { "response": { "response": { "responseFormat": "file" } } } },
+      "id": "cd-api-dl", "name": "⬇️ API: Download Video",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [5000, 940]
+    },
+    {
+      "parameters": {
+        "resource": "video", "operation": "upload",
+        "title": "={{ $('🔀 API: Video or Pin?').item.json.title }}",
+        "regionCode": "US", "categoryId": "22",
+        "options": {
+          "description": "={{ $('🔀 API: Video or Pin?').item.json.caption }}",
+          "privacyStatus": "public",
+          "tags": "={{ ($('🔀 API: Video or Pin?').item.json.hashtags||'').split(' ') }}"
+        },
+        "binaryProperty": "data"
+      },
+      "id": "cd-api-yt", "name": "▶️ API: YouTube Upload",
+      "type": "n8n-nodes-base.youTube", "typeVersion": 1, "position": [5220, 940],
+      "credentials": { "youTubeOAuth2Api": { "id": "YT_CRED_ID", "name": "YouTube OAuth2" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const m=$('🔀 API: Video or Pin?').first().json;\nconst resp=$input.first().json;const vid=resp.id||(resp.id&&resp.id.videoId)||null;\nreturn [{ json:{ chatId:m.chatId, kind:m.kind, platform:m.platform, topic:m.topic, style:m.style, caption:m.caption, media_urls:m.media_urls, link: vid?('https://youtu.be/'+vid):'(uploaded)' } }];"
+      },
+      "id": "cd-result-yt", "name": "📋 Result: YouTube",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5440, 940]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.pinterest.com/v5/pins",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.PINTEREST_ACCESS_TOKEN }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ board_id: ($vars.PINTEREST_BOARD_ID_LIFESTYLE||''), title: ($('🔀 API: Video or Pin?').item.json.title||'').slice(0,100), description: (($('🔀 API: Video or Pin?').item.json.caption||'')).slice(0,500), media_source:{ source_type:'image_url', url: $('🔀 API: Video or Pin?').item.json.media_url } }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-api-pin", "name": "📌 API: Pinterest Pin",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [5000, 1140]
+    },
+    {
+      "parameters": {
+        "jsCode": "const m=$('🔀 API: Video or Pin?').first().json;\nconst resp=$input.first().json;\nreturn [{ json:{ chatId:m.chatId, kind:m.kind, platform:m.platform, topic:m.topic, style:m.style, caption:m.caption, media_urls:m.media_urls, link: resp.id?('Pinterest pin '+resp.id):'(sent to Pinterest API)' } }];"
+      },
+      "id": "cd-result-pin", "name": "📋 Result: Pinterest",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5220, 1140]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_memory",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "return=minimal" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id:$json.chatId, platform:$json.platform, content_type:$json.kind, topic:$json.topic, style:$json.style, caption:$json.caption, media_urls:$json.media_urls, style_tags:$json.style }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-memory-log", "name": "🧠 Log to Memory",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [5660, 1040]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId || $vars.TELEGRAM_CHAT_ID }}",
+        "text": "=✅ *{{ $json.kind }} created & posted!*\n📌 {{ $json.platform }} · {{ $json.style }}\n🔗 {{ $json.link }}\n\n📝 {{ $json.caption }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "cd-notify", "name": "💬 Telegram: Done",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [5880, 1040],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    }
+  ],
+
+  "connections": {
+    "💬 Telegram Command":     { "main": [[{ "node": "🧠 Intake", "type": "main", "index": 0 }]] },
+    "🧠 Intake":               { "main": [[{ "node": "💾 Load Brand State", "type": "main", "index": 0 }]] },
+    "💾 Load Brand State":     { "main": [[{ "node": "🧠 Director Brain Prompt", "type": "main", "index": 0 }]] },
+    "🧠 Director Brain Prompt":{ "main": [[{ "node": "🤖 OpenRouter: Director", "type": "main", "index": 0 }]] },
+    "🤖 OpenRouter: Director": { "main": [[{ "node": "📋 Parse Director", "type": "main", "index": 0 }]] },
+    "📋 Parse Director":       { "main": [[{ "node": "🔀 Route Intent", "type": "main", "index": 0 }]] },
+    "🔀 Route Intent": { "main": [
+      [{ "node": "💾 Save Settings", "type": "main", "index": 0 }],
+      [{ "node": "💾 Save Pending", "type": "main", "index": 0 }],
+      [{ "node": "🎯 Master Brief Prompt", "type": "main", "index": 0 }],
+      [{ "node": "💾 Clear Pending", "type": "main", "index": 0 }],
+      [{ "node": "💬 Reply: Chat", "type": "main", "index": 0 }]
+    ]},
+    "💾 Save Settings":   { "main": [[{ "node": "💬 Reply: Config", "type": "main", "index": 0 }]] },
+    "💾 Save Pending":    { "main": [[{ "node": "💬 Reply: Proposal", "type": "main", "index": 0 }]] },
+    "💾 Clear Pending":   { "main": [[{ "node": "💬 Reply: Cancelled", "type": "main", "index": 0 }]] },
+    "🎯 Master Brief Prompt": { "main": [[{ "node": "🤖 OpenRouter: Master Brief", "type": "main", "index": 0 }]] },
+    "🤖 OpenRouter: Master Brief": { "main": [[{ "node": "📋 Parse Brief", "type": "main", "index": 0 }]] },
+    "📋 Parse Brief":     { "main": [[{ "node": "🧠 Update Brand Memory", "type": "main", "index": 0 }]] },
+    "🧠 Update Brand Memory": { "main": [[{ "node": "🔀 Content Type", "type": "main", "index": 0 }]] },
+    "🔀 Content Type": { "main": [
+      [{ "node": "🎨 Image: Generate", "type": "main", "index": 0 }],
+      [{ "node": "🗂️ Carousel: Split Slides", "type": "main", "index": 0 }],
+      [{ "node": "🎬 Video: Split Scenes", "type": "main", "index": 0 }]
+    ]},
+    "🎨 Image: Generate":  { "main": [[{ "node": "🖼️ Image: Extract", "type": "main", "index": 0 }]] },
+    "🖼️ Image: Extract":  { "main": [[{ "node": "☁️ Image: Host", "type": "main", "index": 0 }]] },
+    "☁️ Image: Host":      { "main": [[{ "node": "📦 Image: Package", "type": "main", "index": 0 }]] },
+    "📦 Image: Package":   { "main": [[{ "node": "🔀 Posting Method?", "type": "main", "index": 0 }]] },
+    "🗂️ Carousel: Split Slides": { "main": [[{ "node": "🎨 Carousel: Slide Image", "type": "main", "index": 0 }]] },
+    "🎨 Carousel: Slide Image":  { "main": [[{ "node": "🖼️ Carousel: Extract", "type": "main", "index": 0 }]] },
+    "🖼️ Carousel: Extract":     { "main": [[{ "node": "☁️ Carousel: Host Slide", "type": "main", "index": 0 }]] },
+    "☁️ Carousel: Host Slide":   { "main": [[{ "node": "📦 Carousel: Package", "type": "main", "index": 0 }]] },
+    "📦 Carousel: Package":      { "main": [[{ "node": "🔀 Posting Method?", "type": "main", "index": 0 }]] },
+    "🎬 Video: Split Scenes":    { "main": [[{ "node": "🔀 Visual Source", "type": "main", "index": 0 }]] },
+    "🔀 Visual Source": { "main": [
+      [{ "node": "🎨 Scene: AI Image", "type": "main", "index": 0 }],
+      [{ "node": "📷 Scene: Pexels Clip", "type": "main", "index": 0 }],
+      [{ "node": "📌 Scene: Pinterest Clip", "type": "main", "index": 0 }],
+      [{ "node": "📷 Scene: Pexels Clip", "type": "main", "index": 0 }]
+    ]},
+    "🎨 Scene: AI Image":   { "main": [[{ "node": "🖼️ Scene: Extract AI", "type": "main", "index": 0 }]] },
+    "🖼️ Scene: Extract AI": { "main": [[{ "node": "☁️ Scene: Host AI", "type": "main", "index": 0 }]] },
+    "☁️ Scene: Host AI":    { "main": [[{ "node": "📋 Scene: AI Ready", "type": "main", "index": 0 }]] },
+    "📋 Scene: AI Ready":   { "main": [[{ "node": "🎞️ Video: Build FFmpeg", "type": "main", "index": 0 }]] },
+    "📷 Scene: Pexels Clip":{ "main": [[{ "node": "📋 Scene: Pexels Ready", "type": "main", "index": 0 }]] },
+    "📋 Scene: Pexels Ready": { "main": [[{ "node": "🎞️ Video: Build FFmpeg", "type": "main", "index": 0 }]] },
+    "📌 Scene: Pinterest Clip": { "main": [[{ "node": "📋 Scene: Pinterest Ready", "type": "main", "index": 0 }]] },
+    "📋 Scene: Pinterest Ready": { "main": [[{ "node": "🎞️ Video: Build FFmpeg", "type": "main", "index": 0 }]] },
+    "🎞️ Video: Build FFmpeg": { "main": [[{ "node": "🖥️ Video: Render", "type": "main", "index": 0 }]] },
+    "🖥️ Video: Render":   { "main": [[{ "node": "📂 Video: Read MP4", "type": "main", "index": 0 }]] },
+    "📂 Video: Read MP4":  { "main": [[{ "node": "☁️ Video: Upload Storage", "type": "main", "index": 0 }]] },
+    "☁️ Video: Upload Storage": { "main": [[{ "node": "📦 Video: Package", "type": "main", "index": 0 }]] },
+    "📦 Video: Package":   { "main": [[{ "node": "🔀 Posting Method?", "type": "main", "index": 0 }]] },
+    "🔀 Posting Method?": { "main": [
+      [{ "node": "📝 Buffer: Build Post", "type": "main", "index": 0 }],
+      [{ "node": "🔀 API: Video or Pin?", "type": "main", "index": 0 }]
+    ]},
+    "📝 Buffer: Build Post": { "main": [[{ "node": "📱 Buffer: Post", "type": "main", "index": 0 }]] },
+    "📱 Buffer: Post":     { "main": [[{ "node": "📋 Result: Buffer", "type": "main", "index": 0 }]] },
+    "📋 Result: Buffer":   { "main": [[{ "node": "🧠 Log to Memory", "type": "main", "index": 0 }]] },
+    "🔀 API: Video or Pin?": { "main": [
+      [{ "node": "⬇️ API: Download Video", "type": "main", "index": 0 }],
+      [{ "node": "📌 API: Pinterest Pin", "type": "main", "index": 0 }]
+    ]},
+    "⬇️ API: Download Video": { "main": [[{ "node": "▶️ API: YouTube Upload", "type": "main", "index": 0 }]] },
+    "▶️ API: YouTube Upload": { "main": [[{ "node": "📋 Result: YouTube", "type": "main", "index": 0 }]] },
+    "📋 Result: YouTube":  { "main": [[{ "node": "🧠 Log to Memory", "type": "main", "index": 0 }]] },
+    "📌 API: Pinterest Pin": { "main": [[{ "node": "📋 Result: Pinterest", "type": "main", "index": 0 }]] },
+    "📋 Result: Pinterest":{ "main": [[{ "node": "🧠 Log to Memory", "type": "main", "index": 0 }]] },
+    "🧠 Log to Memory":    { "main": [[{ "node": "💬 Telegram: Done", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true },
+  "id": "wf-creative-director-v1",
+  "tags": [{ "id": "social-ai", "name": "Social AI" }]
+}
