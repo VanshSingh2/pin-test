@@ -30,7 +30,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const intake=$('🧠 Intake').first().json;\nconst rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nconst s=rows[0]||{};\nconst d={ niche:s.niche||'', style:s.style||'', platform:s.platform||'instagram', content_type:s.content_type||'video', visual_source:s.visual_source||'ai', image_model:s.image_model||'openai/gpt-image-1', video_model:s.video_model||'google/veo-3.1-lite', posting_method:s.posting_method||'buffer', reference:s.reference||'', brand_bible:s.brand_bible||'', pending:s.pending_action||null };\nconst sys=`You are a world-class Creative Director running a multi-platform content studio for one creator. You chat naturally, keep everything ON-BRAND using the brand memory, and ALWAYS CONFIRM before creating.\\n\\nCurrent settings:\\n- niche: \\\"${d.niche||'(not set)'}\\\"\\n- style: \\\"${d.style||'(not set)'}\\\"\\n- platform: ${d.platform}\\n- content_type: ${d.content_type}\\n- visual_source: ${d.visual_source} (ai = AI-generated visuals; pexels/pinterest = real stock clips or images)\\n- image_model: ${d.image_model}\\n- video_model: ${d.video_model}\\n- posting_method: ${d.posting_method} (buffer or api)\\n- reference (clip search phrase): \\\"${d.reference||'(none)'}\\\"\\n- BRAND BIBLE (keep new work consistent with this): \\\"${d.brand_bible||'(empty — first creation)'}\\\"\\n- pending action: ${d.pending?JSON.stringify(d.pending):'(none)'}\\n\\nYou understand free-form requests. The user can set any of: niche, style, platform, content_type (image|carousel|video), visual_source (ai|pexels|pinterest), image_model, video_model, posting_method (buffer|api), reference. They can also paste a SCRIPT to use, or ask you to decide as the specialist.\\n\\nRules:\\n- If they change any setting => intent=set_config and fill the matching set_* fields (only the ones mentioned).\\n- If they ask to CREATE => intent=propose. Fill action {content_type, platform, topic, script, slide_count, visual_source, posting_method}. Use current settings as defaults; if they didn't specify posting method, you MAY ask in the reply (e.g. 'post via Buffer or API?'). Write a short plan and ask them to reply 'yes'.\\n- Confirm (yes/go/make it) with a pending action => intent=confirm.\\n- cancel => intent=cancel. Else intent=chat.\\n- If niche or style is missing when creating, ask them to set it first (intent=chat).\\nRespond STRICT JSON only.`;\nconst usr=`User: \\\"${intake.text}\\\"\\nReturn JSON: {\\n \\\"reply\\\":\\\"natural reply\\\",\\n \\\"intent\\\":\\\"set_config|propose|confirm|cancel|chat\\\",\\n \\\"set_niche\\\":\\\"\\\",\\\"set_style\\\":\\\"\\\",\\\"set_platform\\\":\\\"\\\",\\\"set_content_type\\\":\\\"\\\",\\\"set_visual_source\\\":\\\"\\\",\\\"set_image_model\\\":\\\"\\\",\\\"set_video_model\\\":\\\"\\\",\\\"set_posting_method\\\":\\\"\\\",\\\"set_reference\\\":\\\"\\\",\\n \\\"content_type\\\":\\\"\\\",\\\"platform\\\":\\\"\\\",\\\"topic\\\":\\\"\\\",\\\"script\\\":\\\"\\\",\\\"slide_count\\\":5,\\\"visual_source\\\":\\\"\\\",\\\"posting_method\\\":\\\"\\\"\\n}`;\nreturn [{ json:{ chatId:intake.chatId, d, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:900 } } }];"
+        "jsCode": "const intake=$('🧠 Intake').first().json;\nconst rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nconst s=rows[0]||{};\nconst d={ niche:s.niche||'', style:s.style||'', platform:s.platform||'instagram', content_type:s.content_type||'video', visual_source:s.visual_source||'ai', image_model:s.image_model||'openai/gpt-image-1', video_model:s.video_model||'google/veo-3.1-lite', posting_method:s.posting_method||'buffer', reference:s.reference||'', brand_bible:s.brand_bible||'', pending:s.pending_action||null, history:(s.history||[]) }; const convo=(d.history||[]).slice(-6).map(h=>'U: '+h.u+' / A: '+h.a).join(' || ');\nconst sys=`You are a world-class Creative Director running a multi-platform content studio for one creator. You chat naturally, remember the recent conversation, keep everything ON-BRAND using the brand memory, and ALWAYS CONFIRM before creating. Supported platforms: instagram, youtube, tiktok, pinterest, facebook, both. Recent conversation: ${convo||'(first message)'}.\\n\\nCurrent settings:\\n- niche: \\\"${d.niche||'(not set)'}\\\"\\n- style: \\\"${d.style||'(not set)'}\\\"\\n- platform: ${d.platform}\\n- content_type: ${d.content_type}\\n- visual_source: ${d.visual_source} (ai = AI-generated visuals; pexels/pinterest = real stock clips or images)\\n- image_model: ${d.image_model}\\n- video_model: ${d.video_model}\\n- posting_method: ${d.posting_method} (buffer or api)\\n- reference (clip search phrase): \\\"${d.reference||'(none)'}\\\"\\n- BRAND BIBLE (keep new work consistent with this): \\\"${d.brand_bible||'(empty — first creation)'}\\\"\\n- pending action: ${d.pending?JSON.stringify(d.pending):'(none)'}\\n\\nYou understand free-form requests. The user can set any of: niche, style, platform, content_type (image|carousel|video), visual_source (ai|pexels|pinterest), image_model, video_model, posting_method (buffer|api), reference. They can also paste a SCRIPT to use, or ask you to decide as the specialist.\\n\\nRules:\\n- If they change any setting => intent=set_config and fill the matching set_* fields (only the ones mentioned).\\n- If they ask to CREATE => intent=propose. Fill action {content_type, platform, topic, script, slide_count, visual_source, posting_method}. Use current settings as defaults; if they didn't specify posting method, you MAY ask in the reply (e.g. 'post via Buffer or API?'). Write a short plan and ask them to reply 'yes'.\\n- Confirm (yes/go/make it) with a pending action => intent=confirm.\\n- cancel => intent=cancel. Else intent=chat.\\n- If niche or style is missing when creating, ask them to set it first (intent=chat).\\nRespond STRICT JSON only.`;\nconst usr=`User: \\\"${intake.text}\\\"\\nReturn JSON: {\\n \\\"reply\\\":\\\"natural reply\\\",\\n \\\"intent\\\":\\\"set_config|propose|confirm|cancel|chat\\\",\\n \\\"set_niche\\\":\\\"\\\",\\\"set_style\\\":\\\"\\\",\\\"set_platform\\\":\\\"\\\",\\\"set_content_type\\\":\\\"\\\",\\\"set_visual_source\\\":\\\"\\\",\\\"set_image_model\\\":\\\"\\\",\\\"set_video_model\\\":\\\"\\\",\\\"set_posting_method\\\":\\\"\\\",\\\"set_reference\\\":\\\"\\\",\\n \\\"content_type\\\":\\\"\\\",\\\"platform\\\":\\\"\\\",\\\"topic\\\":\\\"\\\",\\\"script\\\":\\\"\\\",\\\"slide_count\\\":5,\\\"visual_source\\\":\\\"\\\",\\\"posting_method\\\":\\\"\\\"\\n}`;\nreturn [{ json:{ chatId:intake.chatId, d, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:900 } } }];"
       },
       "id": "cd-brain-build", "name": "🧠 Director Brain Prompt",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-40, 500]
@@ -450,7 +450,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const m=$json;\nconst map={ instagram:$vars.BUFFER_PROFILE_ID_INSTAGRAM, youtube:$vars.BUFFER_PROFILE_ID_YOUTUBE, tiktok:$vars.BUFFER_PROFILE_ID_TIKTOK, pinterest:$vars.BUFFER_PROFILE_ID_PINTEREST };\nlet profiles = m.platform==='both' ? [map.instagram,map.youtube,map.tiktok].filter(Boolean) : [map[m.platform]].filter(Boolean);\nconst parts=[];profiles.forEach(p=>parts.push('profile_ids[]='+encodeURIComponent(p)));\nparts.push('text='+encodeURIComponent((m.caption||m.topic)));\nif(m.video_url) parts.push('media[video]='+encodeURIComponent(m.video_url));\nelse if(m.media_url) parts.push('media[photo]='+encodeURIComponent(m.media_url));\nparts.push('now=true');\nreturn [{ json:{ ...m, bufferBody:parts.join('&') } }];"
+        "jsCode": "const m=$json;\nconst map={ instagram:$vars.BUFFER_PROFILE_ID_INSTAGRAM, youtube:$vars.BUFFER_PROFILE_ID_YOUTUBE, tiktok:$vars.BUFFER_PROFILE_ID_TIKTOK, pinterest:$vars.BUFFER_PROFILE_ID_PINTEREST, facebook:$vars.BUFFER_PROFILE_ID_FACEBOOK };\nlet profiles = m.platform==='both' ? [map.instagram,map.youtube,map.tiktok,map.facebook].filter(Boolean) : [map[m.platform]].filter(Boolean);\nconst parts=[];profiles.forEach(p=>parts.push('profile_ids[]='+encodeURIComponent(p)));\nparts.push('text='+encodeURIComponent((m.caption||m.topic)));\nif(m.video_url) parts.push('media[video]='+encodeURIComponent(m.video_url));\nelse if(m.media_url) parts.push('media[photo]='+encodeURIComponent(m.media_url));\nparts.push('now=true');\nreturn [{ json:{ ...m, bufferBody:parts.join('&') } }];"
       },
       "id": "cd-buffer-build", "name": "📝 Buffer: Build Post",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [4780, 720]
@@ -615,6 +615,30 @@
       },
       "id": "cd-car-pin-done", "name": "🖼️ Carousel: Pinterest Slide",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2640, 940]
+    },
+    {
+      "parameters": {
+        "jsCode": "const intake=$('🧠 Intake').first().json; const lr=$('💾 Load Brand State').first().json; const rows=Array.isArray(lr)?lr:(lr.data||[]); const old=(rows[0]&&rows[0].history)||[]; const hist=[...old, { u:(intake.text||'').slice(0,200), a:($json.reply||'').slice(0,200) }].slice(-8); return [{ json:{ chatId:$json.chatId, history:hist } }];"
+      },
+      "id": "cd-history-build", "name": "🧠 Save Turn Build",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [620, 760]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_state?on_conflict=chat_id",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "resolution=merge-duplicates" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id:$json.chatId, history:$json.history, updated_at:$now.toISO() }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-save-turn", "name": "💾 Save Conversation",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [840, 760]
     }
   ],
 
@@ -624,7 +648,8 @@
     "💾 Load Brand State":     { "main": [[{ "node": "🧠 Director Brain Prompt", "type": "main", "index": 0 }]] },
     "🧠 Director Brain Prompt":{ "main": [[{ "node": "🤖 OpenRouter: Director", "type": "main", "index": 0 }]] },
     "🤖 OpenRouter: Director": { "main": [[{ "node": "📋 Parse Director", "type": "main", "index": 0 }]] },
-    "📋 Parse Director":       { "main": [[{ "node": "🔀 Route Intent", "type": "main", "index": 0 }]] },
+    "📋 Parse Director":       { "main": [[{ "node": "🔀 Route Intent", "type": "main", "index": 0 }, { "node": "🧠 Save Turn Build", "type": "main", "index": 0 }]] },
+    "🧠 Save Turn Build":      { "main": [[{ "node": "💾 Save Conversation", "type": "main", "index": 0 }]] },
     "🔀 Route Intent": { "main": [
       [{ "node": "💾 Save Settings", "type": "main", "index": 0 }],
       [{ "node": "💾 Save Pending", "type": "main", "index": 0 }],

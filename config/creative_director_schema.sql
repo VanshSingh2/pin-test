@@ -43,3 +43,11 @@ alter table cd_state  disable row level security;
 alter table cd_memory disable row level security;
 
 -- Reuses the public "videos" Storage bucket (from the video setup) for Reels/Shorts.
+
+
+-- ------------------------------------------------------------
+-- Added later: short conversation memory + Facebook support
+-- ------------------------------------------------------------
+alter table cd_state add column if not exists history jsonb default '[]'::jsonb;
+-- Set n8n variable BUFFER_PROFILE_ID_FACEBOOK to your Facebook page profile id in Buffer.
+-- platform now accepts: instagram | youtube | tiktok | pinterest | facebook | both
