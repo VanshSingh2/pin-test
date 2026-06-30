@@ -30,7 +30,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const intake=$('🧠 Intake').first().json;\nconst rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nconst s=rows[0]||{};\nconst d={ niche:s.niche||'', style:s.style||'', platform:s.platform||'instagram', content_type:s.content_type||'video', visual_source:s.visual_source||'ai', image_model:s.image_model||'openai/gpt-image-1', video_model:s.video_model||'google/veo-3.1-lite', posting_method:s.posting_method||'buffer', reference:s.reference||'', brand_bible:s.brand_bible||'', pending:s.pending_action||null };\nconst sys=`You are a world-class Creative Director running a multi-platform content studio for one creator. You chat naturally, keep everything ON-BRAND using the brand memory, and ALWAYS CONFIRM before creating.\\n\\nCurrent settings:\\n- niche: \\\"${d.niche||'(not set)'}\\\"\\n- style: \\\"${d.style||'(not set)'}\\\"\\n- platform: ${d.platform}\\n- content_type: ${d.content_type}\\n- visual_source: ${d.visual_source} (ai = AI-generated visuals; pexels/pinterest = real clips)\\n- image_model: ${d.image_model}\\n- video_model: ${d.video_model}\\n- posting_method: ${d.posting_method} (buffer or api)\\n- reference (clip search phrase): \\\"${d.reference||'(none)'}\\\"\\n- BRAND BIBLE (keep new work consistent with this): \\\"${d.brand_bible||'(empty — first creation)'}\\\"\\n- pending action: ${d.pending?JSON.stringify(d.pending):'(none)'}\\n\\nYou understand free-form requests. The user can set any of: niche, style, platform, content_type (image|carousel|video), visual_source (ai|pexels|pinterest), image_model, video_model, posting_method (buffer|api), reference. They can also paste a SCRIPT to use, or ask you to decide as the specialist.\\n\\nRules:\\n- If they change any setting => intent=set_config and fill the matching set_* fields (only the ones mentioned).\\n- If they ask to CREATE => intent=propose. Fill action {content_type, platform, topic, script, slide_count, visual_source, posting_method}. Use current settings as defaults; if they didn't specify posting method, you MAY ask in the reply (e.g. 'post via Buffer or API?'). Write a short plan and ask them to reply 'yes'.\\n- Confirm (yes/go/make it) with a pending action => intent=confirm.\\n- cancel => intent=cancel. Else intent=chat.\\n- If niche or style is missing when creating, ask them to set it first (intent=chat).\\nRespond STRICT JSON only.`;\nconst usr=`User: \\\"${intake.text}\\\"\\nReturn JSON: {\\n \\\"reply\\\":\\\"natural reply\\\",\\n \\\"intent\\\":\\\"set_config|propose|confirm|cancel|chat\\\",\\n \\\"set_niche\\\":\\\"\\\",\\\"set_style\\\":\\\"\\\",\\\"set_platform\\\":\\\"\\\",\\\"set_content_type\\\":\\\"\\\",\\\"set_visual_source\\\":\\\"\\\",\\\"set_image_model\\\":\\\"\\\",\\\"set_video_model\\\":\\\"\\\",\\\"set_posting_method\\\":\\\"\\\",\\\"set_reference\\\":\\\"\\\",\\n \\\"content_type\\\":\\\"\\\",\\\"platform\\\":\\\"\\\",\\\"topic\\\":\\\"\\\",\\\"script\\\":\\\"\\\",\\\"slide_count\\\":5,\\\"visual_source\\\":\\\"\\\",\\\"posting_method\\\":\\\"\\\"\\n}`;\nreturn [{ json:{ chatId:intake.chatId, d, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:900 } } }];"
+        "jsCode": "const intake=$('🧠 Intake').first().json;\nconst rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nconst s=rows[0]||{};\nconst d={ niche:s.niche||'', style:s.style||'', platform:s.platform||'instagram', content_type:s.content_type||'video', visual_source:s.visual_source||'ai', image_model:s.image_model||'openai/gpt-image-1', video_model:s.video_model||'google/veo-3.1-lite', posting_method:s.posting_method||'buffer', reference:s.reference||'', brand_bible:s.brand_bible||'', pending:s.pending_action||null };\nconst sys=`You are a world-class Creative Director running a multi-platform content studio for one creator. You chat naturally, keep everything ON-BRAND using the brand memory, and ALWAYS CONFIRM before creating.\\n\\nCurrent settings:\\n- niche: \\\"${d.niche||'(not set)'}\\\"\\n- style: \\\"${d.style||'(not set)'}\\\"\\n- platform: ${d.platform}\\n- content_type: ${d.content_type}\\n- visual_source: ${d.visual_source} (ai = AI-generated visuals; pexels/pinterest = real stock clips or images)\\n- image_model: ${d.image_model}\\n- video_model: ${d.video_model}\\n- posting_method: ${d.posting_method} (buffer or api)\\n- reference (clip search phrase): \\\"${d.reference||'(none)'}\\\"\\n- BRAND BIBLE (keep new work consistent with this): \\\"${d.brand_bible||'(empty — first creation)'}\\\"\\n- pending action: ${d.pending?JSON.stringify(d.pending):'(none)'}\\n\\nYou understand free-form requests. The user can set any of: niche, style, platform, content_type (image|carousel|video), visual_source (ai|pexels|pinterest), image_model, video_model, posting_method (buffer|api), reference. They can also paste a SCRIPT to use, or ask you to decide as the specialist.\\n\\nRules:\\n- If they change any setting => intent=set_config and fill the matching set_* fields (only the ones mentioned).\\n- If they ask to CREATE => intent=propose. Fill action {content_type, platform, topic, script, slide_count, visual_source, posting_method}. Use current settings as defaults; if they didn't specify posting method, you MAY ask in the reply (e.g. 'post via Buffer or API?'). Write a short plan and ask them to reply 'yes'.\\n- Confirm (yes/go/make it) with a pending action => intent=confirm.\\n- cancel => intent=cancel. Else intent=chat.\\n- If niche or style is missing when creating, ask them to set it first (intent=chat).\\nRespond STRICT JSON only.`;\nconst usr=`User: \\\"${intake.text}\\\"\\nReturn JSON: {\\n \\\"reply\\\":\\\"natural reply\\\",\\n \\\"intent\\\":\\\"set_config|propose|confirm|cancel|chat\\\",\\n \\\"set_niche\\\":\\\"\\\",\\\"set_style\\\":\\\"\\\",\\\"set_platform\\\":\\\"\\\",\\\"set_content_type\\\":\\\"\\\",\\\"set_visual_source\\\":\\\"\\\",\\\"set_image_model\\\":\\\"\\\",\\\"set_video_model\\\":\\\"\\\",\\\"set_posting_method\\\":\\\"\\\",\\\"set_reference\\\":\\\"\\\",\\n \\\"content_type\\\":\\\"\\\",\\\"platform\\\":\\\"\\\",\\\"topic\\\":\\\"\\\",\\\"script\\\":\\\"\\\",\\\"slide_count\\\":5,\\\"visual_source\\\":\\\"\\\",\\\"posting_method\\\":\\\"\\\"\\n}`;\nreturn [{ json:{ chatId:intake.chatId, d, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:900 } } }];"
       },
       "id": "cd-brain-build", "name": "🧠 Director Brain Prompt",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-40, 500]
@@ -247,7 +247,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const b=$('📋 Parse Brief').first().json;\nconst slides=(b.slides&&b.slides.length?b.slides:[{image_prompt:b.image_prompt}]);\nreturn slides.map((s,i)=>({ json:{ chatId:b.chatId, job:b.job, platform:b.platform, posting_method:b.posting_method, image_model:b.image_model, niche:b.niche, style:b.style, topic:b.topic, caption:b.caption, title:b.title, hashtags:b.hashtags, style_suffix:b.style_suffix, idx:i, headline:s.headline||'', image_prompt:(s.image_prompt||b.image_prompt) } }));"
+        "jsCode": "const b=$('📋 Parse Brief').first().json;\nconst slides=(b.slides&&b.slides.length?b.slides:[{image_prompt:b.image_prompt}]);\nreturn slides.map((s,i)=>({ json:{ chatId:b.chatId, job:b.job, platform:b.platform, posting_method:b.posting_method, image_model:b.image_model, visual_source:b.visual_source, niche:b.niche, style:b.style, topic:b.topic, caption:b.caption, title:b.title, hashtags:b.hashtags, style_suffix:b.style_suffix, idx:i, headline:s.headline||'', image_prompt:(s.image_prompt||b.image_prompt), query:(b.reference?b.reference:(s.headline||b.topic)) } }));"
       },
       "id": "cd-car-split", "name": "🗂️ Carousel: Split Slides",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2060, 760]
@@ -557,6 +557,64 @@
       "id": "cd-notify", "name": "💬 Telegram: Done",
       "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [5880, 1040],
       "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "isrc", "leftValue": "={{ $('📋 Parse Brief').first().json.visual_source }}", "rightValue": "pinterest", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }
+      },
+      "id": "cd-img-source", "name": "🔀 Image Source",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [1900, 540]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.pinterest.com/search/pins/?q={{ encodeURIComponent($('📋 Parse Brief').first().json.reference || $('📋 Parse Brief').first().json.topic) }}&rs=typed",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "User-Agent", "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" },
+          { "name": "Accept", "value": "text/html,application/xhtml+xml" }
+        ]},
+        "options": { "response": { "response": { "responseFormat": "text", "neverError": true } } }
+      },
+      "id": "cd-img-pin", "name": "📌 Image: Pinterest Search",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2120, 360]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b=$('📋 Parse Brief').first().json;\nlet html=$json.data; if(typeof html!=='string') html=JSON.stringify($json);\nconst re=/https:\\/\\/i\\.pinimg\\.com\\/[^\\\"\\\\ ]+\\.(?:jpg|jpeg|png)/g;\nlet found=[...new Set((html.match(re)||[]))];\nfound.sort((a,b)=>((b.includes('originals')||b.includes('736x')?1:0)-(a.includes('originals')||a.includes('736x')?1:0)));\nconst url=found[0]||'';\nreturn [{ json:{ chatId:b.chatId, job:b.job, kind:'image', platform:b.platform, posting_method:b.posting_method, niche:b.niche, style:b.style, topic:b.topic, caption:b.caption, title:b.title, hashtags:b.hashtags, media_urls:[url], media_url:url, video_url:'' } }];"
+      },
+      "id": "cd-img-pin-done", "name": "🖼️ Image: From Pinterest",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2340, 360]
+    },
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "csrc", "leftValue": "={{ $json.visual_source }}", "rightValue": "pinterest", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }
+      },
+      "id": "cd-car-source", "name": "🔀 Carousel Source",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [2200, 760]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.pinterest.com/search/pins/?q={{ encodeURIComponent($json.query) }}&rs=typed",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "User-Agent", "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" },
+          { "name": "Accept", "value": "text/html,application/xhtml+xml" }
+        ]},
+        "options": { "response": { "response": { "responseFormat": "text", "neverError": true } } }
+      },
+      "id": "cd-car-pin", "name": "📌 Carousel: Pinterest Search",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2420, 940]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base=$('🗂️ Carousel: Split Slides').item.json;\nlet html=$json.data; if(typeof html!=='string') html=JSON.stringify($json);\nconst re=/https:\\/\\/i\\.pinimg\\.com\\/[^\\\"\\\\ ]+\\.(?:jpg|jpeg|png)/g;\nlet found=[...new Set((html.match(re)||[]))];\nfound.sort((a,b)=>((b.includes('originals')||b.includes('736x')?1:0)-(a.includes('originals')||a.includes('736x')?1:0)));\n// pick a different image per slide index when possible\nconst url=found[base.idx % (found.length||1)]||found[0]||'';\nreturn [{ json:{ data:{ display_url:url, url:url } } }];"
+      },
+      "id": "cd-car-pin-done", "name": "🖼️ Carousel: Pinterest Slide",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2640, 940]
     }
   ],
 
@@ -582,15 +640,27 @@
     "📋 Parse Brief":     { "main": [[{ "node": "🧠 Update Brand Memory", "type": "main", "index": 0 }]] },
     "🧠 Update Brand Memory": { "main": [[{ "node": "🔀 Content Type", "type": "main", "index": 0 }]] },
     "🔀 Content Type": { "main": [
-      [{ "node": "🎨 Image: Generate", "type": "main", "index": 0 }],
+      [{ "node": "🔀 Image Source", "type": "main", "index": 0 }],
       [{ "node": "🗂️ Carousel: Split Slides", "type": "main", "index": 0 }],
       [{ "node": "🎬 Video: Split Scenes", "type": "main", "index": 0 }]
     ]},
+    "🔀 Image Source": { "main": [
+      [{ "node": "📌 Image: Pinterest Search", "type": "main", "index": 0 }],
+      [{ "node": "🎨 Image: Generate", "type": "main", "index": 0 }]
+    ]},
+    "📌 Image: Pinterest Search": { "main": [[{ "node": "🖼️ Image: From Pinterest", "type": "main", "index": 0 }]] },
+    "🖼️ Image: From Pinterest":  { "main": [[{ "node": "🔀 Posting Method?", "type": "main", "index": 0 }]] },
     "🎨 Image: Generate":  { "main": [[{ "node": "🖼️ Image: Extract", "type": "main", "index": 0 }]] },
     "🖼️ Image: Extract":  { "main": [[{ "node": "☁️ Image: Host", "type": "main", "index": 0 }]] },
     "☁️ Image: Host":      { "main": [[{ "node": "📦 Image: Package", "type": "main", "index": 0 }]] },
     "📦 Image: Package":   { "main": [[{ "node": "🔀 Posting Method?", "type": "main", "index": 0 }]] },
-    "🗂️ Carousel: Split Slides": { "main": [[{ "node": "🎨 Carousel: Slide Image", "type": "main", "index": 0 }]] },
+    "🗂️ Carousel: Split Slides": { "main": [[{ "node": "🔀 Carousel Source", "type": "main", "index": 0 }]] },
+    "🔀 Carousel Source": { "main": [
+      [{ "node": "📌 Carousel: Pinterest Search", "type": "main", "index": 0 }],
+      [{ "node": "🎨 Carousel: Slide Image", "type": "main", "index": 0 }]
+    ]},
+    "📌 Carousel: Pinterest Search": { "main": [[{ "node": "🖼️ Carousel: Pinterest Slide", "type": "main", "index": 0 }]] },
+    "🖼️ Carousel: Pinterest Slide": { "main": [[{ "node": "📦 Carousel: Package", "type": "main", "index": 0 }]] },
     "🎨 Carousel: Slide Image":  { "main": [[{ "node": "🖼️ Carousel: Extract", "type": "main", "index": 0 }]] },
     "🖼️ Carousel: Extract":     { "main": [[{ "node": "☁️ Carousel: Host Slide", "type": "main", "index": 0 }]] },
     "☁️ Carousel: Host Slide":   { "main": [[{ "node": "📦 Carousel: Package", "type": "main", "index": 0 }]] },
