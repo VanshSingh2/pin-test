@@ -5,7 +5,7 @@ This repo contains **two** all-in-one n8n automation workflows, both backed by *
 | Workflow | File | What it does |
 |----------|------|--------------|
 | 📌 **Pinterest** | `workflows/pinterest_ai_complete.json` | Trends → ideas → DALL-E images → SEO copy → post (Pinterest API **or** Buffer toggle) |
-| 🎬 **YouTube + TikTok** | `workflows/youtube_tiktok_v3_ffmpeg_telegram.json` | ⭐ **v3** — Telegram bot + FFmpeg rendering, OpenAI-only, schedule by IST time |
+| 🎬 **YouTube + TikTok** | `workflows/youtube_tiktok_v4_ondemand_openrouter.json` | ⭐ **v4** — on-demand Telegram bot, OpenRouter image→video, Script Writer + Doctor |
 
 Jump to: [Pinterest](#-pinterest-automation) · [YouTube + TikTok](#-youtube--tiktok-automation)
 
@@ -206,8 +206,9 @@ Trial Access for testing; Buffer mode is unaffected by this.
 
 ## 🎬 YouTube + TikTok Automation
 
-> **Three versions available:**
-> - **`youtube_tiktok_v3_ffmpeg_telegram.json`** ⭐⭐ **newest** — interactive **Telegram bot** + **FFmpeg** rendering (no JSON2Video), **OpenAI-only**, schedule by IST time
+> **Four versions available:**
+> - **`youtube_tiktok_v4_ondemand_openrouter.json`** ⭐⭐⭐ **newest** — **on-demand** Telegram bot, **OpenRouter image→video** (real AI video clips), **Script Writer + Script Doctor** reviewer
+> - `youtube_tiktok_v3_ffmpeg_telegram.json` — Telegram bot + FFmpeg, OpenAI-only, IST scheduling
 > - `youtube_tiktok_v2.json` — data-driven strategy + multi-scene (JSON2Video render)
 > - `youtube_tiktok_complete.json` — original single-image version (reference)
 
@@ -251,6 +252,27 @@ The newest version is **controlled entirely from Telegram** and renders video wi
 | Requires | **self-hosted n8n** with ffmpeg/curl |
 
 > ⚠️ v3 needs **self-hosted n8n** (FFmpeg can't run on n8n Cloud). Run all three schema files (`_v2`, `_v3`) and create a public Supabase Storage bucket named `videos`.
+
+### ⭐⭐⭐ v4 — On-demand + OpenRouter image→video (real AI video, one key)
+
+The newest version is **fully on-demand** (no schedules) and animates **ChatGPT-style AI images into real video clips** using **OpenRouter** (one API key for the LLM, image generation, *and* image-to-video). Full guide: [`config/video_v4_setup.md`](config/video_v4_setup.md).
+
+**You give it a topic OR your own script:**
+- _"make a video about morning routines for students"_ → it writes the script
+- _"script: Ever wonder why... [your full script]"_ → it uses YOUR words
+
+**Pipeline:** Request → ✍️ Script Writer → 🩺 **Script Doctor** (reviews & improves) → 🔍 SEO → 🎨 AI image per scene → 🎬 OpenRouter image→video → 🎞️ FFmpeg (voice + captions) → ▶️ post → 💬 Telegram.
+
+| | v4 |
+|---|---|
+| Trigger | **On-demand only** (Telegram) |
+| Visuals | **AI image → AI video clip** per scene (OpenRouter) |
+| Brains | OpenRouter (one key): LLM + image + video |
+| Script QC | dedicated **Script Doctor** reviewer agent |
+| Cost | ~$0.6–1.6/video (model-dependent) |
+| Requires | self-hosted n8n (FFmpeg) + OpenRouter key |
+
+> The **Script Doctor** is a separate reviewer brain — it polishes the hook/pacing/CTA of either the AI draft or your supplied script, and tells you what it changed.
 
 
 ### 🤝 The Agent Pipeline (mirrors the original 7 agents)
@@ -319,14 +341,16 @@ idea → rendering (JSON2Video) → ready → published → (analytics)
 
 ### 📁 Video Automation Files
 ```
-workflows/youtube_tiktok_v3_ffmpeg_telegram.json  ← ⭐⭐ newest (Telegram + FFmpeg, OpenAI-only)
-workflows/youtube_tiktok_v2.json                  ← data-driven, multi-scene (JSON2Video)
-workflows/youtube_tiktok_complete.json            ← original version (reference)
-config/video_supabase_schema.sql                  ← base Supabase tables
-config/video_supabase_schema_v2.sql               ← v2 extra columns
-config/video_supabase_schema_v3.sql               ← v3 settings table + storage cols
-config/video_variables.md                         ← v1/v2 variables guide
-config/video_v3_setup.md                           ← v3 Telegram + FFmpeg full setup
+workflows/youtube_tiktok_v4_ondemand_openrouter.json  ← ⭐⭐⭐ newest (on-demand, OpenRouter image→video)
+workflows/youtube_tiktok_v3_ffmpeg_telegram.json      ← Telegram + FFmpeg, OpenAI-only
+workflows/youtube_tiktok_v2.json                      ← data-driven, multi-scene (JSON2Video)
+workflows/youtube_tiktok_complete.json                ← original version (reference)
+config/video_supabase_schema.sql                      ← base Supabase tables
+config/video_supabase_schema_v2.sql                   ← v2 extra columns
+config/video_supabase_schema_v3.sql                   ← v3 settings table + storage cols
+config/video_variables.md                             ← v1/v2 variables guide
+config/video_v3_setup.md                              ← v3 Telegram + FFmpeg setup
+config/video_v4_setup.md                              ← v4 on-demand + OpenRouter setup
 ```
 
 ---
