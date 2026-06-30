@@ -1,0 +1,164 @@
+{
+  "name": "🧠 Pinterest AI — 00 Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 4 }] }
+      },
+      "id": "orch-001", "name": "⏰ Every 4 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2, "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2", "operation": "read",
+        "documentId": { "__rl": true, "value": "={{ $vars.GOOGLE_SHEET_ID }}", "mode": "expression" },
+        "sheetName": { "__rl": true, "value": "Content_Queue", "mode": "name" },
+        "options": {}
+      },
+      "id": "orch-002", "name": "📊 Read Content Queue",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.5, "position": [420, 300],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GSHEETS_CRED_ID", "name": "Google Sheets OAuth" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst sc = {};\nitems.forEach(i => { const s = (i.json.status || 'unknown').trim(); sc[s] = (sc[s] || 0) + 1; });\nconst readyToPost = sc['ready_to_post'] || 0;\nconst hasImage    = sc['has_image']    || 0;\nconst hasPrompt   = sc['has_prompt']   || 0;\nconst newIdea     = sc['new_idea']     || 0;\nconst total       = items.length;\nconsole.log('Pipeline state:', JSON.stringify({ readyToPost, hasImage, hasPrompt, newIdea, total }));\nreturn [{ json: {\n  statusCounts: sc,\n  readyToPost, hasImage, hasPrompt, newIdea, total,\n  needsContentPipeline: readyToPost < 3,\n  needsPosting: readyToPost > 0,\n  runAt: new Date().toISOString()\n}}];"
+      },
+      "id": "orch-003", "name": "🧠 Analyze Pipeline State",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "c1", "leftValue": "={{ $json.needsContentPipeline }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equal" } }],
+          "combinator": "and"
+        }
+      },
+      "id": "orch-004", "name": "❓ Need Content Pipeline?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": { "__rl": true, "value": "={{ $vars.WF_TREND_FINDER }}", "mode": "expression" },
+        "waitForSubWorkflow": true
+      },
+      "id": "orch-005", "name": "📈 Run Trend Finder",
+      "type": "n8n-nodes-base.executeWorkflow", "typeVersion": 1.1, "position": [1080, 160]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": { "__rl": true, "value": "={{ $vars.WF_IDEA_GENERATOR }}", "mode": "expression" },
+        "waitForSubWorkflow": true
+      },
+      "id": "orch-006", "name": "💡 Run Idea Generator",
+      "type": "n8n-nodes-base.executeWorkflow", "typeVersion": 1.1, "position": [1300, 160]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": { "__rl": true, "value": "={{ $vars.WF_PROMPT_GENERATOR }}", "mode": "expression" },
+        "waitForSubWorkflow": true
+      },
+      "id": "orch-007", "name": "✍️ Run Prompt Generator",
+      "type": "n8n-nodes-base.executeWorkflow", "typeVersion": 1.1, "position": [1520, 160]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": { "__rl": true, "value": "={{ $vars.WF_THUMBNAIL_DESIGNER }}", "mode": "expression" },
+        "waitForSubWorkflow": true
+      },
+      "id": "orch-008", "name": "🎨 Run Thumbnail Designer",
+      "type": "n8n-nodes-base.executeWorkflow", "typeVersion": 1.1, "position": [1740, 160]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": { "__rl": true, "value": "={{ $vars.WF_CONTENT_CREATOR }}", "mode": "expression" },
+        "waitForSubWorkflow": true
+      },
+      "id": "orch-009", "name": "📝 Run Content Creator",
+      "type": "n8n-nodes-base.executeWorkflow", "typeVersion": 1.1, "position": [1960, 160]
+    },
+    {
+      "parameters": { "mode": "passThrough", "output": "input1" },
+      "id": "orch-010", "name": "🔀 Merge After Content",
+      "type": "n8n-nodes-base.merge", "typeVersion": 3, "position": [2180, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "c2", "leftValue": "={{ $('🧠 Analyze Pipeline State').first().json.needsPosting }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equal" } }],
+          "combinator": "and"
+        }
+      },
+      "id": "orch-011", "name": "❓ Ready to Post?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [2400, 300]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": { "__rl": true, "value": "={{ $vars.WF_POSTING_MANAGER }}", "mode": "expression" },
+        "waitForSubWorkflow": true
+      },
+      "id": "orch-012", "name": "📮 Run Posting Manager",
+      "type": "n8n-nodes-base.executeWorkflow", "typeVersion": 1.1, "position": [2620, 160]
+    },
+    {
+      "parameters": {},
+      "id": "orch-013", "name": "⏭️ Skip Posting",
+      "type": "n8n-nodes-base.noOp", "typeVersion": 1, "position": [2620, 440]
+    },
+    {
+      "parameters": { "mode": "passThrough", "output": "input1" },
+      "id": "orch-014", "name": "🔀 Final Merge",
+      "type": "n8n-nodes-base.merge", "typeVersion": 3, "position": [2840, 300]
+    },
+    {
+      "parameters": {
+        "assignments": { "assignments": [
+          { "id": "a1", "name": "pipelineStatus", "value": "COMPLETE", "type": "string" },
+          { "id": "a2", "name": "completedAt", "value": "={{ $now.toISO() }}", "type": "string" },
+          { "id": "a3", "name": "queueSummary", "value": "={{ $('🧠 Analyze Pipeline State').first().json.statusCounts }}", "type": "object" }
+        ]}
+      },
+      "id": "orch-015", "name": "✅ Log Summary",
+      "type": "n8n-nodes-base.set", "typeVersion": 3.4, "position": [3060, 300]
+    }
+  ],
+
+  "connections": {
+    "⏰ Every 4 Hours":             { "main": [[{ "node": "📊 Read Content Queue",       "type": "main", "index": 0 }]] },
+    "📊 Read Content Queue":        { "main": [[{ "node": "🧠 Analyze Pipeline State",   "type": "main", "index": 0 }]] },
+    "🧠 Analyze Pipeline State":    { "main": [[{ "node": "❓ Need Content Pipeline?",   "type": "main", "index": 0 }]] },
+    "❓ Need Content Pipeline?": {
+      "main": [
+        [{ "node": "📈 Run Trend Finder",     "type": "main", "index": 0 }],
+        [{ "node": "🔀 Merge After Content",  "type": "main", "index": 1 }]
+      ]
+    },
+    "📈 Run Trend Finder":          { "main": [[{ "node": "💡 Run Idea Generator",       "type": "main", "index": 0 }]] },
+    "💡 Run Idea Generator":        { "main": [[{ "node": "✍️ Run Prompt Generator",     "type": "main", "index": 0 }]] },
+    "✍️ Run Prompt Generator":      { "main": [[{ "node": "🎨 Run Thumbnail Designer",   "type": "main", "index": 0 }]] },
+    "🎨 Run Thumbnail Designer":    { "main": [[{ "node": "📝 Run Content Creator",      "type": "main", "index": 0 }]] },
+    "📝 Run Content Creator":       { "main": [[{ "node": "🔀 Merge After Content",      "type": "main", "index": 0 }]] },
+    "🔀 Merge After Content":       { "main": [[{ "node": "❓ Ready to Post?",           "type": "main", "index": 0 }]] },
+    "❓ Ready to Post?": {
+      "main": [
+        [{ "node": "📮 Run Posting Manager",  "type": "main", "index": 0 }],
+        [{ "node": "⏭️ Skip Posting",         "type": "main", "index": 0 }]
+      ]
+    },
+    "📮 Run Posting Manager":       { "main": [[{ "node": "🔀 Final Merge",             "type": "main", "index": 0 }]] },
+    "⏭️ Skip Posting":              { "main": [[{ "node": "🔀 Final Merge",             "type": "main", "index": 1 }]] },
+    "🔀 Final Merge":               { "main": [[{ "node": "✅ Log Summary",             "type": "main", "index": 0 }]] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true, "callerPolicy": "workflowsFromSameOwner" },
+  "id": "wf-00-orchestrator",
+  "tags": [{ "id": "pinterest-ai", "name": "Pinterest AI" }]
+}

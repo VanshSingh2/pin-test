@@ -1,0 +1,183 @@
+{
+  "name": "🎨 Pinterest AI — 04 Thumbnail Designer",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "td-001", "name": "📥 Called by Orchestrator",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1, "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2", "operation": "read",
+        "documentId": { "__rl": true, "value": "={{ $vars.GOOGLE_SHEET_ID }}", "mode": "expression" },
+        "sheetName":  { "__rl": true, "value": "Content_Queue", "mode": "name" },
+        "filtersUI": { "values": [{ "lookupColumn": "status", "lookupValue": "has_prompt" }] },
+        "returnAllMatches": true, "options": { "limit": 3 }
+      },
+      "id": "td-002", "name": "📑 Read Items with Prompts",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.5, "position": [420, 300],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GSHEETS_CRED_ID", "name": "Google Sheets OAuth" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "c1", "leftValue": "={{ $input.all().filter(i=>i.json.id).length }}", "rightValue": 0, "operator": { "type": "number", "operation": "gt" } }],
+          "combinator": "and"
+        }
+      },
+      "id": "td-003", "name": "❓ Has Items to Process?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [640, 300]
+    },
+    {
+      "parameters": { "batchSize": 1, "options": {} },
+      "id": "td-004", "name": "🔄 One by One",
+      "type": "n8n-nodes-base.splitInBatches", "typeVersion": 3, "position": [860, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: {\n  ...item,\n  dalleRequestBody: {\n    model: 'dall-e-3',\n    prompt: item.image_prompt + '. Pinterest aesthetic, portrait orientation, high quality, no text in image.',\n    n: 1,\n    size: '1024x1792',\n    quality: 'standard',\n    response_format: 'url'\n  }\n}}];"
+      },
+      "id": "td-005", "name": "📝 Build DALL-E Request",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1080, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.openai.com/v1/images/generations",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
+          { "name": "Content-Type",  "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.dalleRequestBody) }}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "td-006", "name": "🎨 DALL-E 3: Generate Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1300, 160]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "c2", "leftValue": "={{ $json.data && $json.data[0] && $json.data[0].url ? true : false }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equal" } }],
+          "combinator": "and"
+        }
+      },
+      "id": "td-007", "name": "❓ DALL-E Success?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [1520, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "const dalleResponse = $input.first().json;\nconst originalItem  = $('📝 Build DALL-E Request').first().json;\nconst imageUrl      = dalleResponse.data[0].url;\n\nreturn [{ json: {\n  ...originalItem,\n  rawImageUrl: imageUrl,\n  imgbbRequestBody: {\n    key:    '{{ $vars.IMGBB_API_KEY }}',\n    image:  imageUrl,\n    name:   originalItem.id,\n    expiration: 0\n  }\n}}];"
+      },
+      "id": "td-008", "name": "📝 Prep Imgbb Upload",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1740, 80]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.imgbb.com/1/upload",
+        "sendBody": true, "contentType": "form-urlencoded",
+        "bodyParameters": { "parameters": [
+          { "name": "key",   "value": "={{ $vars.IMGBB_API_KEY }}" },
+          { "name": "image", "value": "={{ $json.rawImageUrl }}" },
+          { "name": "name",  "value": "={{ $json.id }}" }
+        ]},
+        "options": {}
+      },
+      "id": "td-009", "name": "☁️ Imgbb: Host Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1960, 80]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $('📝 Build DALL-E Request').first().json;\nconst keyword = encodeURIComponent((item.title_idea || item.trend_topic || 'aesthetic girl').split(' ').slice(0,3).join(' '));\nreturn [{ json: { ...item, pexelsQuery: keyword } }];"
+      },
+      "id": "td-010", "name": "📝 Prep Pexels Search",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1740, 260]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.pexels.com/v1/search?query={{ $json.pexelsQuery }}&per_page=5&orientation=portrait",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "={{ $vars.PEXELS_API_KEY }}" }
+        ]},
+        "options": {}
+      },
+      "id": "td-011", "name": "📷 Pexels: Fallback Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1960, 260]
+    },
+    {
+      "parameters": { "mode": "passThrough", "output": "input1" },
+      "id": "td-012", "name": "🔀 Merge Image Sources",
+      "type": "n8n-nodes-base.merge", "typeVersion": 3, "position": [2180, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nlet finalUrl = '';\n\n// Check if it's from Imgbb\nif (item.data && item.data.url) {\n  finalUrl = item.data.url;\n} else if (item.data && item.data.display_url) {\n  finalUrl = item.data.display_url;\n// Check if it's from Pexels\n} else if (item.photos && item.photos.length > 0) {\n  finalUrl = item.photos[0].src.large2x || item.photos[0].src.large;\n// Fallback: use raw DALL-E URL (might expire in 1 hour)\n} else if (item.rawImageUrl) {\n  finalUrl = item.rawImageUrl;\n}\n\nconst originalId = item.id || $('🔄 One by One').first().json.id;\nreturn [{ json: { id: originalId, image_url: finalUrl, status: 'has_image' } }];"
+      },
+      "id": "td-013", "name": "📋 Extract Final Image URL",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2400, 160]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2", "operation": "appendOrUpdate",
+        "documentId": { "__rl": true, "value": "={{ $vars.GOOGLE_SHEET_ID }}", "mode": "expression" },
+        "sheetName":  { "__rl": true, "value": "Content_Queue", "mode": "name" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {}, "matchingColumns": ["id"], "schema": [] },
+        "options": {}
+      },
+      "id": "td-014", "name": "💾 Update Row with Image",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.5, "position": [2620, 160],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GSHEETS_CRED_ID", "name": "Google Sheets OAuth" } }
+    },
+    {
+      "parameters": {},
+      "id": "td-015", "name": "⏭️ Skip No Items",
+      "type": "n8n-nodes-base.noOp", "typeVersion": 1, "position": [860, 440]
+    },
+    {
+      "parameters": { "mode": "passThrough", "output": "input1" },
+      "id": "td-016", "name": "🔀 Final Merge",
+      "type": "n8n-nodes-base.merge", "typeVersion": 3, "position": [2840, 300]
+    },
+    {
+      "parameters": { "assignments": { "assignments": [
+        { "id": "a1", "name": "agent",  "value": "Thumbnail Designer", "type": "string" },
+        { "id": "a2", "name": "status", "value": "done",               "type": "string" }
+      ]}},
+      "id": "td-017", "name": "✅ Done",
+      "type": "n8n-nodes-base.set", "typeVersion": 3.4, "position": [3060, 300]
+    }
+  ],
+  "connections": {
+    "📥 Called by Orchestrator":   { "main": [[{ "node": "📑 Read Items with Prompts",    "type": "main", "index": 0 }]] },
+    "📑 Read Items with Prompts":  { "main": [[{ "node": "❓ Has Items to Process?",      "type": "main", "index": 0 }]] },
+    "❓ Has Items to Process?": { "main": [
+      [{ "node": "🔄 One by One",    "type": "main", "index": 0 }],
+      [{ "node": "⏭️ Skip No Items", "type": "main", "index": 0 }]
+    ]},
+    "🔄 One by One":               { "main": [[{ "node": "📝 Build DALL-E Request",       "type": "main", "index": 0 }]] },
+    "📝 Build DALL-E Request":     { "main": [[{ "node": "🎨 DALL-E 3: Generate Image",   "type": "main", "index": 0 }]] },
+    "🎨 DALL-E 3: Generate Image": { "main": [[{ "node": "❓ DALL-E Success?",            "type": "main", "index": 0 }]] },
+    "❓ DALL-E Success?": { "main": [
+      [{ "node": "📝 Prep Imgbb Upload",  "type": "main", "index": 0 }],
+      [{ "node": "📝 Prep Pexels Search", "type": "main", "index": 0 }]
+    ]},
+    "📝 Prep Imgbb Upload":        { "main": [[{ "node": "☁️ Imgbb: Host Image",          "type": "main", "index": 0 }]] },
+    "☁️ Imgbb: Host Image":        { "main": [[{ "node": "🔀 Merge Image Sources",        "type": "main", "index": 0 }]] },
+    "📝 Prep Pexels Search":       { "main": [[{ "node": "📷 Pexels: Fallback Image",     "type": "main", "index": 0 }]] },
+    "📷 Pexels: Fallback Image":   { "main": [[{ "node": "🔀 Merge Image Sources",        "type": "main", "index": 1 }]] },
+    "🔀 Merge Image Sources":      { "main": [[{ "node": "📋 Extract Final Image URL",    "type": "main", "index": 0 }]] },
+    "📋 Extract Final Image URL":  { "main": [[{ "node": "💾 Update Row with Image",      "type": "main", "index": 0 }]] },
+    "💾 Update Row with Image":    { "main": [[{ "node": "🔄 One by One",                 "type": "main", "index": 0 }]] },
+    "⏭️ Skip No Items":           { "main": [[{ "node": "🔀 Final Merge",                "type": "main", "index": 1 }]] },
+    "🔀 Final Merge":              { "main": [[{ "node": "✅ Done",                       "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "id": "wf-04-thumbnail-designer",
+  "tags": [{ "id": "pinterest-ai", "name": "Pinterest AI" }]
+}

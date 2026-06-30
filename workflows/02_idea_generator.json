@@ -1,0 +1,133 @@
+{
+  "name": "💡 Pinterest AI — 02 Idea Generator",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "ig-001", "name": "📥 Called by Orchestrator",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1, "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2", "operation": "read",
+        "documentId": { "__rl": true, "value": "={{ $vars.GOOGLE_SHEET_ID }}", "mode": "expression" },
+        "sheetName":  { "__rl": true, "value": "Trends", "mode": "name" },
+        "filtersUI": { "values": [{ "lookupColumn": "used", "lookupValue": "no" }] },
+        "returnAllMatches": true, "options": { "limit": 3 }
+      },
+      "id": "ig-002", "name": "📑 Read Unused Trends",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.5, "position": [420, 300],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GSHEETS_CRED_ID", "name": "Google Sheets OAuth" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const trends = $input.all().filter(i => i.json.trend_topic);\nif (trends.length === 0) return [{ json: { _noTrends: true } }];\n\nconst trendList = trends.map(t => `- ${t.json.trend_topic} (${t.json.category})`).join('\\n');\n\nconst systemPrompt = 'You are a Pinterest content strategist for girls and women aged 16-35. Create diverse, engaging, scroll-stopping pin ideas. Return ONLY valid JSON arrays.';\n\nconst userPrompt = `Create 5 unique Pinterest pin ideas for EACH of these ${trends.length} trending topics:\\n${trendList}\\n\\nFor each idea return a JSON object:\\n{\"trend_topic\":\"...\",\"title_idea\":\"...\",\"category\":\"fashion|beauty|lifestyle|quotes|diy|wellness|food|travel\",\"content_type\":\"quote|outfit|tip|diy|recipe|aesthetic|tutorial|motivation\",\"angle\":\"brief description of the creative angle\"}\\n\\nReturn a flat JSON array of ${trends.length * 5} items total.`;\n\nreturn [{ json: {\n  trendIds:    trends.map(t => t.json.id),\n  trendTopics: trends.map(t => t.json.trend_topic),\n  requestBody: { model:'gpt-4o-mini', messages:[\n    { role:'system', content: systemPrompt },\n    { role:'user',   content: userPrompt }\n  ], temperature: 0.9, max_tokens: 2500 }\n}}];"
+      },
+      "id": "ig-003", "name": "📝 Build Ideas Request",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "c1", "leftValue": "={{ $json._noTrends }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notEqual" } }],
+          "combinator": "and"
+        }
+      },
+      "id": "ig-004", "name": "❓ Trends Available?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
+          { "name": "Content-Type",  "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {}
+      },
+      "id": "ig-005", "name": "🤖 OpenAI: Generate Ideas",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1080, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response   = $input.first().json;\nconst buildNode  = $('📝 Build Ideas Request').first().json;\nconst raw        = response.choices[0].message.content;\n\nlet ideas = [];\ntry { ideas = JSON.parse(raw); }\ncatch(e) { const m = raw.match(/\\[([\\s\\S]*?)\\](?=[^\\[]*$)/); if(m) { try { ideas = JSON.parse('['+m[0].slice(1,-1)+']'); } catch(e2){} } }\n\nconst ts = Date.now();\nreturn ideas.map((idea, i) => ({ json: {\n  id:           `PIN_${ts}_${i}`,\n  trend_topic:  idea.trend_topic  || buildNode.trendTopics[0],\n  title_idea:   idea.title_idea   || idea.title || '',\n  category:     idea.category     || 'lifestyle',\n  content_type: idea.content_type || 'aesthetic',\n  angle:        idea.angle        || '',\n  status:       'new_idea',\n  date_created: new Date().toISOString()\n}}));"
+      },
+      "id": "ig-006", "name": "📋 Parse Ideas",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1300, 160]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2", "operation": "append",
+        "documentId": { "__rl": true, "value": "={{ $vars.GOOGLE_SHEET_ID }}", "mode": "expression" },
+        "sheetName":  { "__rl": true, "value": "Content_Queue", "mode": "name" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {}, "matchingColumns": [], "schema": [] },
+        "options": {}
+      },
+      "id": "ig-007", "name": "💾 Save Ideas to Queue",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.5, "position": [1520, 160],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GSHEETS_CRED_ID", "name": "Google Sheets OAuth" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const buildNode = $('📝 Build Ideas Request').first().json;\nconst trendIds  = buildNode.trendIds || [];\nreturn trendIds.map(id => ({ json: { id, used: 'yes' } }));"
+      },
+      "id": "ig-008", "name": "🔄 Prepare Trend Updates",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1520, 320]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2", "operation": "appendOrUpdate",
+        "documentId": { "__rl": true, "value": "={{ $vars.GOOGLE_SHEET_ID }}", "mode": "expression" },
+        "sheetName":  { "__rl": true, "value": "Trends", "mode": "name" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {}, "matchingColumns": ["id"], "schema": [] },
+        "options": {}
+      },
+      "id": "ig-009", "name": "🔄 Mark Trends Used",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.5, "position": [1740, 320],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GSHEETS_CRED_ID", "name": "Google Sheets OAuth" } }
+    },
+    {
+      "parameters": {},
+      "id": "ig-010", "name": "⏭️ Skip No Trends",
+      "type": "n8n-nodes-base.noOp", "typeVersion": 1, "position": [1080, 440]
+    },
+    {
+      "parameters": { "mode": "passThrough", "output": "input1" },
+      "id": "ig-011", "name": "🔀 Final Merge",
+      "type": "n8n-nodes-base.merge", "typeVersion": 3, "position": [1960, 300]
+    },
+    {
+      "parameters": { "assignments": { "assignments": [
+        { "id": "a1", "name": "agent",  "value": "Idea Generator", "type": "string" },
+        { "id": "a2", "name": "status", "value": "done",           "type": "string" }
+      ]}},
+      "id": "ig-012", "name": "✅ Done",
+      "type": "n8n-nodes-base.set", "typeVersion": 3.4, "position": [2180, 300]
+    }
+  ],
+  "connections": {
+    "📥 Called by Orchestrator": { "main": [[{ "node": "📑 Read Unused Trends",    "type": "main", "index": 0 }]] },
+    "📑 Read Unused Trends":     { "main": [[{ "node": "📝 Build Ideas Request",   "type": "main", "index": 0 }]] },
+    "📝 Build Ideas Request":    { "main": [[{ "node": "❓ Trends Available?",     "type": "main", "index": 0 }]] },
+    "❓ Trends Available?": { "main": [
+      [{ "node": "🤖 OpenAI: Generate Ideas", "type": "main", "index": 0 }],
+      [{ "node": "⏭️ Skip No Trends",        "type": "main", "index": 0 }]
+    ]},
+    "🤖 OpenAI: Generate Ideas": { "main": [[{ "node": "📋 Parse Ideas",           "type": "main", "index": 0 }]] },
+    "📋 Parse Ideas":            { "main": [[{ "node": "💾 Save Ideas to Queue",   "type": "main", "index": 0 },
+                                             { "node": "🔄 Prepare Trend Updates", "type": "main", "index": 0 }]] },
+    "💾 Save Ideas to Queue":    { "main": [[{ "node": "🔀 Final Merge",           "type": "main", "index": 0 }]] },
+    "🔄 Prepare Trend Updates":  { "main": [[{ "node": "🔄 Mark Trends Used",      "type": "main", "index": 0 }]] },
+    "🔄 Mark Trends Used":       { "main": [[{ "node": "🔀 Final Merge",           "type": "main", "index": 1 }]] },
+    "⏭️ Skip No Trends":        { "main": [[{ "node": "🔀 Final Merge",           "type": "main", "index": 1 }]] },
+    "🔀 Final Merge":            { "main": [[{ "node": "✅ Done",                  "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "id": "wf-02-idea-generator",
+  "tags": [{ "id": "pinterest-ai", "name": "Pinterest AI" }]
+}

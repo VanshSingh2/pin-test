@@ -1,0 +1,117 @@
+{
+  "name": "📝 Pinterest AI — 05 Content Creator",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "cc-001", "name": "📥 Called by Orchestrator",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1, "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2", "operation": "read",
+        "documentId": { "__rl": true, "value": "={{ $vars.GOOGLE_SHEET_ID }}", "mode": "expression" },
+        "sheetName":  { "__rl": true, "value": "Content_Queue", "mode": "name" },
+        "filtersUI": { "values": [{ "lookupColumn": "status", "lookupValue": "has_image" }] },
+        "returnAllMatches": true, "options": { "limit": 5 }
+      },
+      "id": "cc-002", "name": "📑 Read Items with Images",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.5, "position": [420, 300],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GSHEETS_CRED_ID", "name": "Google Sheets OAuth" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "c1", "leftValue": "={{ $input.all().filter(i=>i.json.id).length }}", "rightValue": 0, "operator": { "type": "number", "operation": "gt" } }],
+          "combinator": "and"
+        }
+      },
+      "id": "cc-003", "name": "❓ Has Items?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [640, 300]
+    },
+    {
+      "parameters": { "batchSize": 1, "options": {} },
+      "id": "cc-004", "name": "🔄 One by One",
+      "type": "n8n-nodes-base.splitInBatches", "typeVersion": 3, "position": [860, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nconst boardMap = {\n  fashion:   $vars.PINTEREST_BOARD_ID_FASHION   || '',\n  beauty:    $vars.PINTEREST_BOARD_ID_BEAUTY    || '',\n  lifestyle: $vars.PINTEREST_BOARD_ID_LIFESTYLE || '',\n  quotes:    $vars.PINTEREST_BOARD_ID_QUOTES    || '',\n  diy:       $vars.PINTEREST_BOARD_ID_LIFESTYLE || '',\n  wellness:  $vars.PINTEREST_BOARD_ID_LIFESTYLE || '',\n  food:      $vars.PINTEREST_BOARD_ID_LIFESTYLE || '',\n  travel:    $vars.PINTEREST_BOARD_ID_LIFESTYLE || ''\n};\n\nconst systemPrompt = `You are a Pinterest SEO and copywriting expert for a girls/women lifestyle brand. Create engaging, keyword-optimised Pinterest content that drives saves and clicks. Return ONLY valid JSON.`;\n\nconst userPrompt = `Write Pinterest pin copy for:\\nIdea: \"${item.title_idea}\"\\nCategory: ${item.category}\\nContent Type: ${item.content_type}\\n\\nReturn JSON:\\n{\\n  \"pin_title\": \"SEO title max 100 chars, keyword-rich, no emojis in title\",\\n  \"pin_description\": \"Engaging description max 500 chars, include keywords naturally, end with a CTA\",\\n  \"hashtags\": \"20 relevant hashtags space-separated starting with #\",\\n  \"board_name\": \"${item.category}\"\\n}`;\n\nreturn [{ json: {\n  ...item,\n  boardId: boardMap[item.category] || boardMap.lifestyle,\n  requestBody: { model:'gpt-4o-mini', messages:[\n    { role:'system', content: systemPrompt },\n    { role:'user',   content: userPrompt }\n  ], temperature: 0.75, max_tokens: 800 }\n}}];"
+      },
+      "id": "cc-005", "name": "📝 Build Content Request",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1080, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
+          { "name": "Content-Type",  "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {}
+      },
+      "id": "cc-006", "name": "🤖 OpenAI: Write Pin Content",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1300, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response  = $input.first().json;\nconst prevItem  = $('📝 Build Content Request').first().json;\nconst raw       = response.choices[0].message.content.trim();\n\nlet content = {};\ntry { content = JSON.parse(raw); }\ncatch(e) { const m = raw.match(/\\{[\\s\\S]*\\}/); if(m) content = JSON.parse(m[0]); }\n\n// Enforce Pinterest limits\nconst title = (content.pin_title || prevItem.title_idea || '').slice(0, 100);\nconst desc  = (content.pin_description || '').slice(0, 500);\nconst tags  = (content.hashtags || '').split(' ').filter(t => t.startsWith('#')).slice(0, 20).join(' ');\n\nreturn [{ json: {\n  id:              prevItem.id,\n  pin_title:       title,\n  pin_description: desc,\n  hashtags:        tags,\n  board_id:        prevItem.boardId,\n  board_name:      content.board_name || prevItem.category,\n  status:          'ready_to_post'\n}}];"
+      },
+      "id": "cc-007", "name": "📋 Parse & Validate Content",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1520, 160]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2", "operation": "appendOrUpdate",
+        "documentId": { "__rl": true, "value": "={{ $vars.GOOGLE_SHEET_ID }}", "mode": "expression" },
+        "sheetName":  { "__rl": true, "value": "Content_Queue", "mode": "name" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {}, "matchingColumns": ["id"], "schema": [] },
+        "options": {}
+      },
+      "id": "cc-008", "name": "💾 Mark Ready to Post",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.5, "position": [1740, 160],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GSHEETS_CRED_ID", "name": "Google Sheets OAuth" } }
+    },
+    {
+      "parameters": {},
+      "id": "cc-009", "name": "⏭️ Skip No Items",
+      "type": "n8n-nodes-base.noOp", "typeVersion": 1, "position": [860, 440]
+    },
+    {
+      "parameters": { "mode": "passThrough", "output": "input1" },
+      "id": "cc-010", "name": "🔀 Final Merge",
+      "type": "n8n-nodes-base.merge", "typeVersion": 3, "position": [1960, 300]
+    },
+    {
+      "parameters": { "assignments": { "assignments": [
+        { "id": "a1", "name": "agent",  "value": "Content Creator", "type": "string" },
+        { "id": "a2", "name": "status", "value": "done",            "type": "string" }
+      ]}},
+      "id": "cc-011", "name": "✅ Done",
+      "type": "n8n-nodes-base.set", "typeVersion": 3.4, "position": [2180, 300]
+    }
+  ],
+  "connections": {
+    "📥 Called by Orchestrator":  { "main": [[{ "node": "📑 Read Items with Images",     "type": "main", "index": 0 }]] },
+    "📑 Read Items with Images":  { "main": [[{ "node": "❓ Has Items?",                 "type": "main", "index": 0 }]] },
+    "❓ Has Items?": { "main": [
+      [{ "node": "🔄 One by One",    "type": "main", "index": 0 }],
+      [{ "node": "⏭️ Skip No Items", "type": "main", "index": 0 }]
+    ]},
+    "🔄 One by One":              { "main": [[{ "node": "📝 Build Content Request",      "type": "main", "index": 0 }]] },
+    "📝 Build Content Request":   { "main": [[{ "node": "🤖 OpenAI: Write Pin Content",  "type": "main", "index": 0 }]] },
+    "🤖 OpenAI: Write Pin Content":{ "main": [[{ "node": "📋 Parse & Validate Content", "type": "main", "index": 0 }]] },
+    "📋 Parse & Validate Content":{ "main": [[{ "node": "💾 Mark Ready to Post",        "type": "main", "index": 0 }]] },
+    "💾 Mark Ready to Post":      { "main": [[{ "node": "🔄 One by One",                "type": "main", "index": 0 }]] },
+    "⏭️ Skip No Items":          { "main": [[{ "node": "🔀 Final Merge",               "type": "main", "index": 1 }]] },
+    "🔀 Final Merge":             { "main": [[{ "node": "✅ Done",                      "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "id": "wf-05-content-creator",
+  "tags": [{ "id": "pinterest-ai", "name": "Pinterest AI" }]
+}
