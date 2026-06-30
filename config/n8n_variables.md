@@ -1,57 +1,61 @@
 # n8n Variables Setup
 
 Go to **n8n → Settings → Variables** and add all of these.
+(n8n Variables require the self-hosted "Pro" feature or n8n Cloud. If unavailable, paste the values directly into the nodes, or use Credentials.)
 
 ---
 
-## API Keys
+## 🔑 API Keys
 
 | Variable Name | Value | Where to Get |
 |--------------|-------|--------------|
 | `OPENAI_API_KEY` | `sk-...` | platform.openai.com |
 | `PINTEREST_ACCESS_TOKEN` | `pina_...` | developers.pinterest.com |
-| `BUFFER_ACCESS_TOKEN` | `...` | buffer.com/developers |
-| `PEXELS_API_KEY` | `...` | pexels.com/api |
+| `BUFFER_ACCESS_TOKEN` | `1/...` | buffer.com/developers |
 | `IMGBB_API_KEY` | `...` | api.imgbb.com |
-| `SERPAPI_KEY` | `...` | serpapi.com (optional) |
 
 ---
 
-## Google Sheets
+## 🗄️ Supabase
 
 | Variable Name | Value | Notes |
 |--------------|-------|-------|
-| `GOOGLE_SHEET_ID` | `1BxiM...` | From Google Sheets URL |
+| `SUPABASE_URL` | `https://xxxx.supabase.co` | Project Settings → API → Project URL |
+| `SUPABASE_SERVICE_KEY` | `eyJ...` | Project Settings → API → `service_role` secret key |
+
+> ⚠️ Use the **`service_role`** key (not the `anon` key) so the workflow can write to tables. Keep it secret.
 
 ---
 
-## Pinterest Config
+## 📌 Pinterest Boards
 
 | Variable Name | Value | Notes |
 |--------------|-------|-------|
-| `PINTEREST_BOARD_ID_FASHION` | `123456789` | From board URL |
-| `PINTEREST_BOARD_ID_BEAUTY` | `123456789` | From board URL |
-| `PINTEREST_BOARD_ID_LIFESTYLE` | `123456789` | From board URL |
-| `PINTEREST_BOARD_ID_QUOTES` | `123456789` | From board URL |
+| `PINTEREST_BOARD_ID_FASHION` | `123...` | From board URL |
+| `PINTEREST_BOARD_ID_BEAUTY` | `123...` | From board URL |
+| `PINTEREST_BOARD_ID_LIFESTYLE` | `123...` | Default/fallback board |
+| `PINTEREST_BOARD_ID_QUOTES` | `123...` | From board URL |
 
 ---
 
-## Buffer Config
+## 📱 Buffer
 
 | Variable Name | Value | Notes |
 |--------------|-------|-------|
-| `BUFFER_PROFILE_ID` | `...` | From Buffer profile settings |
+| `BUFFER_PROFILE_ID` | `...` | Your Pinterest profile ID in Buffer |
 
 ---
 
-## Sub-Workflow IDs (fill AFTER importing all workflows)
+## 🎛️ Posting Toggle (NOT a variable — set inside the workflow)
 
-| Variable Name | Value | Notes |
-|--------------|-------|-------|
-| `WF_TREND_FINDER` | `1` | ID shown in n8n after import |
-| `WF_IDEA_GENERATOR` | `2` | ID shown in n8n after import |
-| `WF_PROMPT_GENERATOR` | `3` | ID shown in n8n after import |
-| `WF_THUMBNAIL_DESIGNER` | `4` | ID shown in n8n after import |
-| `WF_CONTENT_CREATOR` | `5` | ID shown in n8n after import |
-| `WF_POSTING_MANAGER` | `6` | ID shown in n8n after import |
-| `WF_ANALYTICS_TRACKER` | `7` | ID shown in n8n after import |
+The posting method toggle lives in the **`⚙️ CONTROL PANEL`** node inside the workflow,
+so you can flip it without touching variables:
+
+| Field | Options | Meaning |
+|-------|---------|---------|
+| `postingMethod` | `pinterest` or `buffer` | Which service posts the pin |
+| `postsPerRun` | number (e.g. `2`) | How many pins to create per run |
+| `niche` | text | Your content niche description |
+| `enabled` | `true` / `false` | Master on/off switch for the whole automation |
+
+To switch posting: open the workflow → click **⚙️ CONTROL PANEL** → change `postingMethod`.

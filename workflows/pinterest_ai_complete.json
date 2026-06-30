@@ -1,0 +1,401 @@
+{
+  "name": "🤖 Pinterest AI — Complete Automation (All-in-One)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 4 }] }
+      },
+      "id": "trg-post", "name": "⏰ Posting Schedule (4h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2, "position": [-100, 400]
+    },
+    {
+      "parameters": {
+        "assignments": { "assignments": [
+          { "id": "p1", "name": "postingMethod", "value": "pinterest", "type": "string" },
+          { "id": "p2", "name": "postsPerRun",   "value": 2,           "type": "number" },
+          { "id": "p3", "name": "niche",         "value": "girls lifestyle, fashion, beauty, motivational quotes, wellness, aesthetic", "type": "string" },
+          { "id": "p4", "name": "enabled",       "value": true,        "type": "boolean" }
+        ]}
+      },
+      "id": "ctrl-panel", "name": "⚙️ CONTROL PANEL",
+      "type": "n8n-nodes-base.set", "typeVersion": 3.4, "position": [120, 400],
+      "notes": "TOGGLE HERE:\npostingMethod = 'pinterest'  → post via Pinterest API\npostingMethod = 'buffer'     → post via Buffer\npostsPerRun = how many pins per run\nenabled = master on/off switch"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "en", "leftValue": "={{ $json.enabled }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equal" } }],
+          "combinator": "and"
+        }
+      },
+      "id": "if-enabled", "name": "❓ Automation Enabled?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [340, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('⚙️ CONTROL PANEL').first().json;\nconst now = new Date();\nconst months=['January','February','March','April','May','June','July','August','September','October','November','December'];\nconst month = months[now.getMonth()];\nconst year  = now.getFullYear();\nconst n = cfg.postsPerRun || 2;\n\nconst systemPrompt = `You are a Pinterest content strategist for the niche: ${cfg.niche}. Create scroll-stopping, currently-trending pin ideas for ${month} ${year}. Return ONLY valid JSON.`;\nconst userPrompt = `Generate exactly ${n} unique, trending Pinterest pin ideas for ${month} ${year}.\\nReturn a JSON array of ${n} objects:\\n[{\\\"trend_topic\\\":\\\"...\\\",\\\"title_idea\\\":\\\"specific pin idea\\\",\\\"category\\\":\\\"fashion|beauty|lifestyle|quotes|wellness|diy|food\\\",\\\"content_type\\\":\\\"quote|outfit|tip|diy|recipe|aesthetic|tutorial\\\"}]`;\n\nreturn [{ json: { requestBody: { model:'gpt-4o-mini', messages:[ {role:'system',content:systemPrompt},{role:'user',content:userPrompt} ], temperature:0.9, max_tokens:1200 } } }];"
+      },
+      "id": "build-ideas", "name": "🗓 Build Idea Prompt",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [560, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
+          { "name": "Content-Type",  "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {}
+      },
+      "id": "openai-ideas", "name": "💡 OpenAI: Generate Ideas",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [780, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.choices[0].message.content;\nlet ideas=[];\ntry { ideas = JSON.parse(raw); } catch(e){ const m=raw.match(/\\[([\\s\\S]*)\\]/); if(m){ try{ideas=JSON.parse(m[0]);}catch(e2){} } }\nif(!Array.isArray(ideas)||!ideas.length) throw new Error('No ideas parsed from OpenAI');\nreturn ideas.map(i=>({ json:{\n  trend_topic:  i.trend_topic || '',\n  title_idea:   i.title_idea  || i.title || '',\n  category:     i.category    || 'lifestyle',\n  content_type: i.content_type|| 'aesthetic',\n  status:       'new_idea'\n}}));"
+      },
+      "id": "parse-ideas", "name": "📋 Parse Ideas",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/content_queue",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey",        "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type",  "value": "application/json" },
+          { "name": "Prefer",        "value": "return=representation" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ trend_topic:$json.trend_topic, title_idea:$json.title_idea, category:$json.category, content_type:$json.content_type, status:'new_idea' }) }}",
+        "options": {}
+      },
+      "id": "sb-insert-idea", "name": "💾 Supabase: Insert Idea",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(i=>{ const r=Array.isArray(i.json)?i.json[0]:i.json; return { json:r }; });"
+      },
+      "id": "norm-rows", "name": "📋 Normalize Rows",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1440, 300]
+    },
+    {
+      "parameters": { "batchSize": 1, "options": {} },
+      "id": "loop", "name": "🔄 Process Each Pin",
+      "type": "n8n-nodes-base.splitInBatches", "typeVersion": 3, "position": [1660, 300]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const item=$input.first().json;\nconst sys='You are an expert AI image prompt engineer for Pinterest visuals in the girls/women lifestyle niche. Return ONLY the prompt text.';\nconst usr=`Write a DALL-E 3 prompt for a Pinterest pin about: \"${item.title_idea}\" (category ${item.category}, type ${item.content_type}).\\nRequirements: portrait 2:3, feminine aesthetic, soft pastel palette, no text in image, photorealistic or tasteful digital art, natural lighting, magazine-quality. Return only the prompt.`;\nreturn [{ json:{ ...item, requestBody:{ model:'gpt-4o-mini', messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.8, max_tokens:300 } } }];"
+      },
+      "id": "build-prompt", "name": "✍️ Build Image Prompt",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1880, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
+          { "name": "Content-Type",  "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}", "options": {}
+      },
+      "id": "openai-prompt", "name": "🤖 OpenAI: Image Prompt",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2100, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prompt=$input.first().json.choices[0].message.content.trim();\nconst item=$('✍️ Build Image Prompt').first().json;\nreturn [{ json:{ ...item, image_prompt:prompt, dalleBody:{ model:'dall-e-3', prompt:prompt+'. Pinterest aesthetic, portrait, no text.', n:1, size:'1024x1792', quality:'standard', response_format:'url' } } }];"
+      },
+      "id": "extract-prompt", "name": "📋 Extract Prompt",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2320, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.openai.com/v1/images/generations",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
+          { "name": "Content-Type",  "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.dalleBody) }}",
+        "options": { "timeout": 60000, "response": { "response": { "neverError": true } } }
+      },
+      "id": "dalle", "name": "🎨 DALL-E 3: Generate Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2540, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp=$input.first().json;\nconst item=$('📋 Extract Prompt').first().json;\nlet url=''; try{ url=resp.data[0].url; }catch(e){}\nreturn [{ json:{ ...item, rawImageUrl:url } }];"
+      },
+      "id": "extract-img", "name": "📋 Get DALL-E URL",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2760, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.imgbb.com/1/upload",
+        "sendBody": true, "contentType": "form-urlencoded",
+        "bodyParameters": { "parameters": [
+          { "name": "key",   "value": "={{ $vars.IMGBB_API_KEY }}" },
+          { "name": "image", "value": "={{ $json.rawImageUrl }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "imgbb", "name": "☁️ Imgbb: Host Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2980, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp=$input.first().json;\nconst item=$('📋 Get DALL-E URL').first().json;\nlet hosted='';\ntry{ hosted = resp.data.url || resp.data.display_url; }catch(e){}\nconst finalUrl = hosted || item.rawImageUrl;\nconst sys='You are a Pinterest SEO copywriter for a girls/women lifestyle brand. Return ONLY valid JSON.';\nconst usr=`Write Pinterest copy for: \"${item.title_idea}\" (category ${item.category}, type ${item.content_type}).\\nReturn JSON:{\\\"pin_title\\\":\\\"max 100 chars keyword-rich\\\",\\\"pin_description\\\":\\\"max 500 chars with CTA\\\",\\\"hashtags\\\":\\\"20 space-separated #tags\\\"}`;\nreturn [{ json:{ ...item, image_url:finalUrl, status:'has_image', requestBody:{ model:'gpt-4o-mini', messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.75, max_tokens:700 } } }];"
+      },
+      "id": "extract-hosted", "name": "📋 Final Image + Copy Prompt",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3200, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
+          { "name": "Content-Type",  "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}", "options": {}
+      },
+      "id": "openai-copy", "name": "📝 OpenAI: Write Pin Copy",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [3420, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw=$input.first().json.choices[0].message.content.trim();\nconst item=$('📋 Final Image + Copy Prompt').first().json;\nlet c={}; try{ c=JSON.parse(raw); }catch(e){ const m=raw.match(/\\{[\\s\\S]*\\}/); if(m)c=JSON.parse(m[0]); }\nconst boardMap={ fashion:$vars.PINTEREST_BOARD_ID_FASHION, beauty:$vars.PINTEREST_BOARD_ID_BEAUTY, quotes:$vars.PINTEREST_BOARD_ID_QUOTES };\nconst board=boardMap[item.category]||$vars.PINTEREST_BOARD_ID_LIFESTYLE||'';\nreturn [{ json:{ ...item,\n  pin_title:(c.pin_title||item.title_idea||'').slice(0,100),\n  pin_description:(c.pin_description||'').slice(0,500),\n  hashtags:(c.hashtags||''),\n  board_id:board, board_name:item.category, status:'ready_to_post' } }];"
+      },
+      "id": "parse-copy", "name": "📋 Parse Pin Copy",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3640, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "tg", "leftValue": "={{ $('⚙️ CONTROL PANEL').first().json.postingMethod }}", "rightValue": "buffer", "operator": { "type": "string", "operation": "equals" } }],
+          "combinator": "and"
+        }
+      },
+      "id": "toggle", "name": "🔀 TOGGLE: Buffer or Pinterest?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [3860, 200]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.bufferapp.com/1/updates/create.json?access_token={{ $vars.BUFFER_ACCESS_TOKEN }}",
+        "sendBody": true, "contentType": "form-urlencoded",
+        "bodyParameters": { "parameters": [
+          { "name": "profile_ids[]", "value": "={{ $vars.BUFFER_PROFILE_ID }}" },
+          { "name": "text",          "value": "={{ $json.pin_title + '\\n\\n' + $json.pin_description + '\\n\\n' + ($json.hashtags||'') }}" },
+          { "name": "media[photo]",  "value": "={{ $json.image_url }}" },
+          { "name": "now",           "value": "true" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "post-buffer", "name": "📱 Buffer: Post Pin",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [4080, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp=$input.first().json;\nconst item=$('📋 Parse Pin Copy').first().json;\nconst ok = resp.success || (resp.updates && resp.updates.length>0);\nconst pid = (resp.updates && resp.updates[0] && resp.updates[0].id) || null;\nreturn [{ json:{ id:item.id, status: ok?'posted_buffer':'failed', platform:'buffer', pin_id:pid, posted_at:new Date().toISOString(), error_notes: ok?null:'Buffer post failed' } }];"
+      },
+      "id": "prep-buffer", "name": "📋 Buffer Result",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [4300, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.pinterest.com/v5/pins",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.PINTEREST_ACCESS_TOKEN }}" },
+          { "name": "Content-Type",  "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ board_id:$json.board_id, title:$json.pin_title, description:($json.pin_description+'\\n\\n'+($json.hashtags||'')), media_source:{ source_type:'image_url', url:$json.image_url } }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "post-pin", "name": "📌 Pinterest: Create Pin",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [4080, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp=$input.first().json;\nconst item=$('📋 Parse Pin Copy').first().json;\nconst ok = resp && resp.id;\nreturn [{ json:{ id:item.id, status: ok?'posted':'failed', platform:'pinterest', pin_id: ok?resp.id:null, posted_at:new Date().toISOString(), error_notes: ok?null:('Pinterest error: '+JSON.stringify(resp).slice(0,250)) } }];"
+      },
+      "id": "prep-pin", "name": "📋 Pinterest Result",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [4300, 300]
+    },
+    {
+      "parameters": { "mode": "passThrough", "output": "input1" },
+      "id": "merge-post", "name": "🔀 Merge Post Result",
+      "type": "n8n-nodes-base.merge", "typeVersion": 3, "position": [4520, 200]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/content_queue?id=eq.{{ $json.id }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey",        "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type",  "value": "application/json" },
+          { "name": "Prefer",        "value": "return=minimal" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ status:$json.status, platform:$json.platform, pin_id:$json.pin_id, posted_at:$json.posted_at, error_notes:$json.error_notes }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "sb-update", "name": "💾 Supabase: Update Result",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [4740, 200]
+    },
+    {
+      "parameters": {},
+      "id": "skip-disabled", "name": "⏭️ Disabled — Skip",
+      "type": "n8n-nodes-base.noOp", "typeVersion": 1, "position": [560, 520]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items=$('🔄 Process Each Pin').context && $('🔄 Process Each Pin').all ? $input.all() : $input.all();\nreturn [{ json:{ run:'complete', finishedAt:new Date().toISOString(), method:$('⚙️ CONTROL PANEL').first().json.postingMethod, processed:items.length } }];"
+      },
+      "id": "done", "name": "✅ Run Complete",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2100, 460]
+    },
+
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 9 * * *" }] }
+      },
+      "id": "trg-analytics", "name": "⏰ Analytics Schedule (Daily 9AM)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2, "position": [-100, 800]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/content_queue?status=eq.posted&platform=eq.pinterest&select=pin_id,pin_title&limit=50",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey",        "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" }
+        ]},
+        "options": {}
+      },
+      "id": "sb-get-posted", "name": "💾 Supabase: Get Posted Pins",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [120, 800]
+    },
+    {
+      "parameters": { "fieldToSplitOut": "data", "options": {} },
+      "id": "split-pins", "name": "📋 Split Pins",
+      "type": "n8n-nodes-base.itemLists", "typeVersion": 3, "position": [340, 800]
+    },
+    {
+      "parameters": { "batchSize": 1, "options": {} },
+      "id": "loop-analytics", "name": "🔄 Each Pin Analytics",
+      "type": "n8n-nodes-base.splitInBatches", "typeVersion": 3, "position": [560, 800]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.pinterest.com/v5/pins/{{ $json.pin_id }}/analytics?start_date={{ $now.minus({days:7}).toFormat('yyyy-MM-dd') }}&end_date={{ $now.toFormat('yyyy-MM-dd') }}&metric_types=IMPRESSION,SAVE,PIN_CLICK,OUTBOUND_CLICK",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.PINTEREST_ACCESS_TOKEN }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "pin-analytics", "name": "📊 Pinterest: Get Analytics",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [780, 800]
+    },
+    {
+      "parameters": {
+        "jsCode": "const a=$input.first().json;\nconst pin=$('🔄 Each Pin Analytics').first().json;\nlet imp=0,sav=0,clk=0,out=0;\ntry{ const d=(a.all&&a.all.daily_metrics)||[]; d.forEach(x=>{ const m=x.metrics||{}; imp+=m.IMPRESSION||0; sav+=m.SAVE||0; clk+=m.PIN_CLICK||0; out+=m.OUTBOUND_CLICK||0; }); }catch(e){}\nreturn [{ json:{ pin_id:pin.pin_id, pin_title:pin.pin_title||'', impressions:imp, saves:sav, clicks:clk, outbound_clicks:out, save_rate: imp?+(sav/imp*100).toFixed(2):0, click_rate: imp?+(clk/imp*100).toFixed(2):0 } }];"
+      },
+      "id": "proc-analytics", "name": "📋 Process Analytics",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1000, 800]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/analytics",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey",        "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type",  "value": "application/json" },
+          { "name": "Prefer",        "value": "return=minimal" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "sb-save-analytics", "name": "💾 Supabase: Save Analytics",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1220, 800]
+    }
+  ],
+  "connections": {
+    "⏰ Posting Schedule (4h)":        { "main": [[{ "node": "⚙️ CONTROL PANEL",            "type": "main", "index": 0 }]] },
+    "⚙️ CONTROL PANEL":                { "main": [[{ "node": "❓ Automation Enabled?",      "type": "main", "index": 0 }]] },
+    "❓ Automation Enabled?": { "main": [
+      [{ "node": "🗓 Build Idea Prompt", "type": "main", "index": 0 }],
+      [{ "node": "⏭️ Disabled — Skip",   "type": "main", "index": 0 }]
+    ]},
+    "🗓 Build Idea Prompt":            { "main": [[{ "node": "💡 OpenAI: Generate Ideas",    "type": "main", "index": 0 }]] },
+    "💡 OpenAI: Generate Ideas":       { "main": [[{ "node": "📋 Parse Ideas",               "type": "main", "index": 0 }]] },
+    "📋 Parse Ideas":                  { "main": [[{ "node": "💾 Supabase: Insert Idea",     "type": "main", "index": 0 }]] },
+    "💾 Supabase: Insert Idea":        { "main": [[{ "node": "📋 Normalize Rows",            "type": "main", "index": 0 }]] },
+    "📋 Normalize Rows":               { "main": [[{ "node": "🔄 Process Each Pin",          "type": "main", "index": 0 }]] },
+    "🔄 Process Each Pin": { "main": [
+      [{ "node": "✅ Run Complete",        "type": "main", "index": 0 }],
+      [{ "node": "✍️ Build Image Prompt",  "type": "main", "index": 0 }]
+    ]},
+    "✍️ Build Image Prompt":           { "main": [[{ "node": "🤖 OpenAI: Image Prompt",      "type": "main", "index": 0 }]] },
+    "🤖 OpenAI: Image Prompt":         { "main": [[{ "node": "📋 Extract Prompt",            "type": "main", "index": 0 }]] },
+    "📋 Extract Prompt":               { "main": [[{ "node": "🎨 DALL-E 3: Generate Image",  "type": "main", "index": 0 }]] },
+    "🎨 DALL-E 3: Generate Image":     { "main": [[{ "node": "📋 Get DALL-E URL",            "type": "main", "index": 0 }]] },
+    "📋 Get DALL-E URL":               { "main": [[{ "node": "☁️ Imgbb: Host Image",         "type": "main", "index": 0 }]] },
+    "☁️ Imgbb: Host Image":            { "main": [[{ "node": "📋 Final Image + Copy Prompt", "type": "main", "index": 0 }]] },
+    "📋 Final Image + Copy Prompt":    { "main": [[{ "node": "📝 OpenAI: Write Pin Copy",    "type": "main", "index": 0 }]] },
+    "📝 OpenAI: Write Pin Copy":       { "main": [[{ "node": "📋 Parse Pin Copy",            "type": "main", "index": 0 }]] },
+    "📋 Parse Pin Copy":               { "main": [[{ "node": "🔀 TOGGLE: Buffer or Pinterest?", "type": "main", "index": 0 }]] },
+    "🔀 TOGGLE: Buffer or Pinterest?": { "main": [
+      [{ "node": "📱 Buffer: Post Pin",     "type": "main", "index": 0 }],
+      [{ "node": "📌 Pinterest: Create Pin","type": "main", "index": 0 }]
+    ]},
+    "📱 Buffer: Post Pin":             { "main": [[{ "node": "📋 Buffer Result",             "type": "main", "index": 0 }]] },
+    "📋 Buffer Result":                { "main": [[{ "node": "🔀 Merge Post Result",         "type": "main", "index": 0 }]] },
+    "📌 Pinterest: Create Pin":        { "main": [[{ "node": "📋 Pinterest Result",          "type": "main", "index": 0 }]] },
+    "📋 Pinterest Result":             { "main": [[{ "node": "🔀 Merge Post Result",         "type": "main", "index": 1 }]] },
+    "🔀 Merge Post Result":            { "main": [[{ "node": "💾 Supabase: Update Result",   "type": "main", "index": 0 }]] },
+    "💾 Supabase: Update Result":      { "main": [[{ "node": "🔄 Process Each Pin",          "type": "main", "index": 0 }]] },
+    "⏰ Analytics Schedule (Daily 9AM)":{ "main": [[{ "node": "💾 Supabase: Get Posted Pins", "type": "main", "index": 0 }]] },
+    "💾 Supabase: Get Posted Pins":    { "main": [[{ "node": "📋 Split Pins",                "type": "main", "index": 0 }]] },
+    "📋 Split Pins":                   { "main": [[{ "node": "🔄 Each Pin Analytics",        "type": "main", "index": 0 }]] },
+    "🔄 Each Pin Analytics": { "main": [
+      [],
+      [{ "node": "📊 Pinterest: Get Analytics", "type": "main", "index": 0 }]
+    ]},
+    "📊 Pinterest: Get Analytics":     { "main": [[{ "node": "📋 Process Analytics",         "type": "main", "index": 0 }]] },
+    "📋 Process Analytics":            { "main": [[{ "node": "💾 Supabase: Save Analytics",  "type": "main", "index": 0 }]] },
+    "💾 Supabase: Save Analytics":     { "main": [[{ "node": "🔄 Each Pin Analytics",        "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true },
+  "id": "wf-pinterest-ai-complete",
+  "tags": [{ "id": "pinterest-ai", "name": "Pinterest AI" }]
+}
