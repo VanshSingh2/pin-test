@@ -5,7 +5,7 @@ This repo contains **two** all-in-one n8n automation workflows, both backed by *
 | Workflow | File | What it does |
 |----------|------|--------------|
 | 📌 **Pinterest** | `workflows/pinterest_ai_complete.json` | Trends → ideas → DALL-E images → SEO copy → post (Pinterest API **or** Buffer toggle) |
-| 🎬 **YouTube + TikTok** | `workflows/youtube_tiktok_complete.json` | Strategy → script → thumbnail → AI video render → publish to YouTube **and/or** TikTok |
+| 🎬 **YouTube + TikTok** | `workflows/youtube_tiktok_v2.json` | Data-driven strategy → multi-scene script → b-roll video → publish to YouTube **and/or** TikTok (API or Buffer) |
 
 Jump to: [Pinterest](#-pinterest-automation) · [YouTube + TikTok](#-youtube--tiktok-automation)
 
@@ -206,7 +206,24 @@ Trial Access for testing; Buffer mode is unaffected by this.
 
 ## 🎬 YouTube + TikTok Automation
 
-A second all-in-one workflow (`workflows/youtube_tiktok_complete.json`) that creates and publishes **short-form videos** to YouTube and/or TikTok automatically. It's modeled on the multi-agent architecture from [darkzOGx/youtube-automation-agent](https://github.com/darkzOGx/youtube-automation-agent), rebuilt for n8n with a TikTok publishing path added. *(Architecture notes were summarized/rephrased for licensing compliance.)*
+> **Two versions available:**
+> - **`youtube_tiktok_v2.json`** ⭐ **recommended** — smarter, data-driven strategy + multi-scene video
+> - `youtube_tiktok_complete.json` — original single-image version (kept for reference)
+
+A second all-in-one workflow that creates and publishes **short-form videos** to YouTube and/or TikTok automatically. It's modeled on the multi-agent architecture from [darkzOGx/youtube-automation-agent](https://github.com/darkzOGx/youtube-automation-agent), rebuilt for n8n with a TikTok publishing path added. *(Architecture notes were summarized/rephrased for licensing compliance.)*
+
+### ⭐ What's new in v2
+
+| Area | v1 | v2 (better) |
+|------|----|-------------|
+| **Strategy** | Picks a topic blind | **Data-driven** — feeds past top-performers + recent topics back into the strategy agent, and avoids repeats |
+| **Script** | One narration blob | **Retention framework** — hook → 3-4 value beats → payoff → CTA, scene-by-scene |
+| **Visuals** | Single static AI image | **Multi-scene** — real Pexels stock b-roll per scene + word-by-word captions |
+| **Model** | gpt-4o-mini | **gpt-4o** with `response_format: json_object` (reliable parsing) |
+| **Per-scene** | — | Each scene has its own narration, caption, and b-roll keyword |
+
+v2 needs the extra schema columns — run [`config/video_supabase_schema_v2.sql`](config/video_supabase_schema_v2.sql) **after** the base schema, and add `PEXELS_API_KEY`.
+
 
 ### 🤝 The Agent Pipeline (mirrors the original 7 agents)
 
@@ -274,8 +291,10 @@ idea → rendering (JSON2Video) → ready → published → (analytics)
 
 ### 📁 Video Automation Files
 ```
-workflows/youtube_tiktok_complete.json   ← the all-in-one video workflow
+workflows/youtube_tiktok_v2.json         ← ⭐ recommended (data-driven, multi-scene)
+workflows/youtube_tiktok_complete.json   ← original version (reference)
 config/video_supabase_schema.sql         ← Supabase tables (run once)
+config/video_supabase_schema_v2.sql      ← v2 extra columns (run after base, for v2)
 config/video_variables.md                ← variables + credentials guide
 ```
 

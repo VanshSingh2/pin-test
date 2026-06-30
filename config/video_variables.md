@@ -14,6 +14,7 @@ multi-agent architecture, rebuilt for n8n with YouTube **and** TikTok publishing
 | `OPENAI_API_KEY` | `sk-...` | platform.openai.com |
 | `IMGBB_API_KEY` | `...` | api.imgbb.com (thumbnail hosting) |
 | `JSON2VIDEO_API_KEY` | `...` | json2video.com (video rendering) |
+| `PEXELS_API_KEY` | `...` | pexels.com/api (free b-roll video for v2 scenes) |
 | `SUPABASE_URL` | `https://xxxx.supabase.co` | Supabase → Settings → API |
 | `SUPABASE_SERVICE_KEY` | `eyJ...` | Supabase → Settings → API → `service_role` |
 | `TIKTOK_ACCESS_TOKEN` | `act....` | TikTok for Developers (Content Posting API) |
