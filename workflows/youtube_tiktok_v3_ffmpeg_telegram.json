@@ -1,0 +1,601 @@
+{
+  "name": "🎬 YouTube + TikTok AI v3 — FFmpeg + Telegram Bot (All-in-One)",
+  "nodes": [
+    {
+      "parameters": { "updates": ["message"], "additionalFields": {} },
+      "id": "tg-trigger", "name": "💬 Telegram Command",
+      "type": "n8n-nodes-base.telegramTrigger", "typeVersion": 1.2, "position": [-400, 200],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const msg=$input.first().json.message||{};\nconst text=(msg.text||'').trim();\nconst chatId=(msg.chat&&msg.chat.id)||'';\nconst nowIst=new Date(Date.now()+330*60000).toISOString().replace('T',' ').slice(0,16);\nconst sys='You are the command parser for a video automation bot. Convert the user message into strict JSON. Times the user gives are in IST (Asia/Kolkata). Respond JSON only.';\nconst usr=`Current IST time: ${nowIst}.\\nUser message: \\\"${text}\\\"\\nReturn JSON: {\\n \\\"action\\\": \\\"generate | settime | setplatform | status | help\\\",\\n \\\"topic\\\": \\\"video topic if given else empty\\\",\\n \\\"datetime_ist\\\": \\\"YYYY-MM-DD HH:MM if a specific post time is given, else empty\\\",\\n \\\"best_time\\\": true/false (true if user wants best/optimal time or no specific time),\\n \\\"platform\\\": \\\"youtube | tiktok | both | empty\\\",\\n \\\"daily_time\\\": \\\"HH:MM if user wants to set a daily posting time, else empty\\\"\\n}`;\nreturn [{ json:{ chatId, rawText:text, requestBody:{ model:'gpt-4o', response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.1, max_tokens:300 } } }];"
+      },
+      "id": "tg-build", "name": "🧠 Build Intent Prompt",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-180, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}", "options": {}
+      },
+      "id": "tg-ai", "name": "🤖 OpenAI: Parse Intent",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [40, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev=$('🧠 Build Intent Prompt').first().json;\nconst raw=$input.first().json.choices[0].message.content;\nlet o={};try{o=JSON.parse(raw);}catch(e){const m=raw.match(/\\{[\\s\\S]*\\}/);if(m)o=JSON.parse(m[0]);}\n// convert IST datetime to UTC ISO\nfunction istToUtc(s){ if(!s) return ''; const d=new Date(s.replace(' ','T')+':00+05:30'); return isNaN(d)?'':d.toISOString(); }\nreturn [{ json:{ chatId:prev.chatId, rawText:prev.rawText, action:o.action||'help', topic:o.topic||'', platform:(o.platform||'').trim(), best_time: o.best_time!==false, daily_time:o.daily_time||'', postAtUtc: istToUtc(o.datetime_ist), datetime_ist:o.datetime_ist||'' } }];"
+      },
+      "id": "tg-intent", "name": "📋 Parse Intent",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [260, 200]
+    },
+    {
+      "parameters": {
+        "rules": { "values": [
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "g", "leftValue": "={{ $json.action }}", "rightValue": "generate", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "generate" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "st", "leftValue": "={{ $json.action }}", "rightValue": "settime", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "settime" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "sp", "leftValue": "={{ $json.action }}", "rightValue": "setplatform", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "setplatform" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "stt", "leftValue": "={{ $json.action }}", "rightValue": "status", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "status" }
+        ]}, "options": { "fallbackOutput": "extra" }
+      },
+      "id": "route", "name": "🔀 Route Action",
+      "type": "n8n-nodes-base.switch", "typeVersion": 3, "position": [480, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/settings?on_conflict=key",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "resolution=merge-duplicates" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ key:'daily_time', value: ($json.daily_time || $json.datetime_ist || '18:00').slice(0,5) }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "set-time", "name": "💾 Save Daily Time",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [760, 60]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('📋 Parse Intent').first().json.chatId }}",
+        "text": "=✅ Daily auto-post time set to *{{ ($('📋 Parse Intent').first().json.daily_time || '18:00') }}* IST.\nI'll generate and post a video every day at that time.",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "reply-time", "name": "💬 Reply: Time Set",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [980, 60],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/settings?on_conflict=key",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "resolution=merge-duplicates" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ key:'platform', value: ($json.platform || 'youtube') }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "set-plat", "name": "💾 Save Platform",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [760, 200]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('📋 Parse Intent').first().json.chatId }}",
+        "text": "=✅ Default platform set to *{{ ($('📋 Parse Intent').first().json.platform || 'youtube') }}*.",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "reply-plat", "name": "💬 Reply: Platform Set",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [980, 200],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/video_queue?select=status,title,scheduled_time&order=created_at.desc&limit=10",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "get-queue", "name": "💾 Get Queue",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [760, 340]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nlet lines=rows.map(r=>`• [${r.status}] ${r.title||'(untitled)'}${r.scheduled_time?(' → '+new Date(new Date(r.scheduled_time).getTime()+330*60000).toISOString().slice(0,16).replace('T',' ')+' IST'):''}`);\nconst txt= rows.length? ('📊 *Last 10 in queue:*\\n'+lines.join('\\n')) : 'Queue is empty. Send me a topic to generate a video!';\nreturn [{ json:{ chatId:$('📋 Parse Intent').first().json.chatId, statusText:txt } }];"
+      },
+      "id": "fmt-status", "name": "📋 Format Status",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [980, 340]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.statusText }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "reply-status", "name": "💬 Reply: Status",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [1200, 340],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('📋 Parse Intent').first().json.chatId }}",
+        "text": "🤖 *Video Bot Commands*\n\n• _\"make a video about morning routines and post at best time\"_\n• _\"create a short on saving money, post tomorrow 7pm\"_\n• _\"set daily posting time to 18:30\"_\n• _\"set platform to both\"_\n• _\"status\"_\n\nTimes are IST. I generate the script, thumbnail, voiceover & video, then publish to YouTube/TikTok.",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "reply-help", "name": "💬 Reply: Help",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [760, 480],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const i=$('📋 Parse Intent').first().json;\nreturn [{ json:{ topic:i.topic||'', platform:(i.platform||'').trim(), postAtUtc:i.postAtUtc||'', best_time:i.best_time, source:'telegram', chatId:i.chatId } }];"
+      },
+      "id": "norm-tg", "name": "📥 Normalize Request (TG)",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [760, 620]
+    },
+
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 * * * *" }] } },
+      "id": "sch-daily", "name": "⏰ Daily Check (Hourly)",
+      "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [-400, 920]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/settings?select=key,value",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "get-settings", "name": "💾 Get Settings",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-180, 920]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nconst s={};rows.forEach(r=>s[r.key]=r.value);\nconst dailyEnabled=(s.daily_enabled||'true')==='true';\nconst dailyTime=(s.daily_time||'18:00');\n// current IST HH:MM\nconst ist=new Date(Date.now()+330*60000);\nconst hh=String(ist.getUTCHours()).padStart(2,'0');\nconst mm=String(ist.getUTCMinutes()).padStart(2,'0');\nconst curHour=hh;\nconst tgtHour=(dailyTime.split(':')[0]||'18').padStart(2,'0');\n// fire when the hour matches (runs hourly, so match on hour)\nconst isTime = dailyEnabled && curHour===tgtHour;\nreturn [{ json:{ isTime, dailyTime, platform:(s.platform||'youtube'), nowIst:`${hh}:${mm}` } }];"
+      },
+      "id": "is-time", "name": "🕐 Is It Posting Time?",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [40, 920]
+    },
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "t", "leftValue": "={{ $json.isTime }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equal" } }], "combinator": "and" }
+      },
+      "id": "if-time", "name": "❓ Time to Generate?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [260, 920]
+    },
+    {
+      "parameters": {
+        "jsCode": "const s=$('🕐 Is It Posting Time?').first().json;\n// daily auto-run: no fixed topic (data-driven), publish at best time, platform from settings\nreturn [{ json:{ topic:'', platform:s.platform||'youtube', postAtUtc:'', best_time:true, source:'schedule', chatId: $vars.TELEGRAM_CHAT_ID || '' } }];"
+      },
+      "id": "norm-daily", "name": "📥 Normalize Request (Daily)",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [480, 920]
+    },
+
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/video_analytics?select=title,platform,views,performance&order=performance.desc&limit=5",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "gen-top", "name": "📈 Research: Top Performers",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1000, 760]
+    },
+    {
+      "parameters": {
+        "jsCode": "const req=$input.first().json;\nconst topRaw=$('📈 Research: Top Performers').first().json;\nconst top=(Array.isArray(topRaw)?topRaw:(topRaw.data||[])).map(r=>`\\\"${r.title}\\\" (score ${r.performance})`);\nconst plat=req.platform|| 'youtube';\nconst sys=`You are a world-class short-form content strategist. You understand hooks, retention curves, and viral patterns for ${plat}. Respond with strict JSON only.`;\nlet usr;\nif(req.topic){ usr=`The creator requested this exact topic: \\\"${req.topic}\\\".\\nSharpen it into the highest-retention angle.\\nReturn JSON: {\\\"topic\\\":\\\"refined specific topic\\\",\\\"content_pillar\\\":\\\"education|inspiration|story|listicle|howto\\\",\\\"target_audience\\\":\\\"who\\\",\\\"hook_angle\\\":\\\"the curiosity/tension angle\\\"}`; }\nelse { const data= top.length?`Past winners to emulate:\\n- ${top.join('\\n- ')}`:'No history yet; pick a proven evergreen angle.'; usr=`${data}\\nChoose a fresh, trend-aware topic for ${plat}.\\nReturn JSON: {\\\"topic\\\":\\\"specific topic\\\",\\\"content_pillar\\\":\\\"education|inspiration|story|listicle|howto\\\",\\\"target_audience\\\":\\\"who\\\",\\\"hook_angle\\\":\\\"the curiosity/tension angle\\\"}`; }\nreturn [{ json:{ ...req, requestBody:{ model:'gpt-4o', response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.8, max_tokens:400 } } }];"
+      },
+      "id": "gen-strat", "name": "🧭 Agent: Strategy",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1220, 760]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}", "options": {}
+      },
+      "id": "gen-ai-strat", "name": "🤖 OpenAI: Strategy",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1440, 760]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev=$('🧭 Agent: Strategy').first().json;\nconst raw=$input.first().json.choices[0].message.content;\nlet s={};try{s=JSON.parse(raw);}catch(e){const m=raw.match(/\\{[\\s\\S]*\\}/);if(m)s=JSON.parse(m[0]);}\nconst sys='You are an award-winning short-form scriptwriter. Use this proven structure: PATTERN-INTERRUPT HOOK (0-3s) -> escalating value BEATS -> surprising PAYOFF -> crisp CTA. Write natural spoken narration (no stage directions). Each beat = one scene with narration, a punchy on-screen caption (<=6 words), and a SPECIFIC stock-footage search keyword (visual nouns). Respond with strict JSON only.';\nconst usr=`Topic: ${s.topic}\\nAudience: ${s.target_audience}\\nHook angle: ${s.hook_angle}\\nPillar: ${s.content_pillar}\\nConstraints: total spoken 90-140 words; 5 scenes; conversational, punchy, no filler.\\nReturn JSON: {\\\"hook\\\":\\\"spoken hook line\\\",\\\"scenes\\\":[{\\\"narration\\\":\\\"...\\\",\\\"on_screen_text\\\":\\\"...\\\",\\\"broll_keyword\\\":\\\"...\\\"}],\\\"cta\\\":\\\"spoken CTA\\\"}`;\nreturn [{ json:{ ...prev, topic:s.topic, content_pillar:s.content_pillar, target_audience:s.target_audience, hook_angle:s.hook_angle, requestBody:{ model:'gpt-4o', response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.85, max_tokens:1200 } } }];"
+      },
+      "id": "gen-script", "name": "✍️ Agent: Script",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1660, 760]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}", "options": {}
+      },
+      "id": "gen-ai-script", "name": "🤖 OpenAI: Script",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1880, 760]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev=$('✍️ Agent: Script').first().json;\nconst raw=$input.first().json.choices[0].message.content;\nlet sc={};try{sc=JSON.parse(raw);}catch(e){const m=raw.match(/\\{[\\s\\S]*\\}/);if(m)sc=JSON.parse(m[0]);}\nconst scenes=(sc.scenes||[]).slice(0,6).map((x,i)=>({ idx:i, narration:x.narration||'', on_screen_text:x.on_screen_text||'', broll_keyword:x.broll_keyword||prev.topic }));\nconst fullScript=[sc.hook,...scenes.map(s=>s.narration),sc.cta].filter(Boolean).join(' ');\nconst sys='You are a YouTube/TikTok packaging + SEO expert. Generate scroll-stopping metadata. Respond with strict JSON only.';\nconst usr=`Topic: ${prev.topic}\\nAudience: ${prev.target_audience}\\nReturn JSON: {\\\"title\\\":\\\"<=70 char curiosity title, no false claims\\\",\\\"description\\\":\\\"2-3 sentences, keywords + CTA\\\",\\\"tags\\\":\\\"12 comma-separated keywords\\\",\\\"hashtags\\\":\\\"8 space-separated #tags\\\"}`;\nreturn [{ json:{ ...prev, hook:sc.hook||'', scenes, cta:sc.cta||'', script:fullScript, requestBody:{ model:'gpt-4o', response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.7, max_tokens:500 } } }];"
+      },
+      "id": "gen-seo", "name": "🔍 Agent: SEO",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2100, 760]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}", "options": {}
+      },
+      "id": "gen-ai-seo", "name": "🤖 OpenAI: SEO",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2320, 760]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev=$('🔍 Agent: SEO').first().json;\nconst raw=$input.first().json.choices[0].message.content;\nlet o={};try{o=JSON.parse(raw);}catch(e){const m=raw.match(/\\{[\\s\\S]*\\}/);if(m)o=JSON.parse(m[0]);}\nconst thumbPrompt=`Ultra eye-catching vertical 9:16 thumbnail for a short video titled \\\"${o.title||prev.topic}\\\". Bold dramatic lighting, one striking focal subject, vivid saturated colors, strong emotion, cinematic depth, leaves clear negative space at the top for text overlay. No text, no watermark.`;\nreturn [{ json:{ ...prev, title:(o.title||prev.topic||'').slice(0,95), description:o.description||'', tags:o.tags||'', hashtags:o.hashtags||'', imageBody:{ model:'gpt-image-1', prompt:thumbPrompt, size:'1024x1536', quality:'high', n:1 } } }];"
+      },
+      "id": "gen-thumb", "name": "🎨 Agent: Thumbnail",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2540, 760]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.openai.com/v1/images/generations",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENAI_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.imageBody) }}",
+        "options": { "timeout": 120000, "response": { "response": { "neverError": true } } }
+      },
+      "id": "gen-ai-thumb", "name": "🖼️ OpenAI: Thumbnail (gpt-image-1)",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2760, 760]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.imgbb.com/1/upload",
+        "sendBody": true, "contentType": "form-urlencoded",
+        "bodyParameters": { "parameters": [
+          { "name": "key", "value": "={{ $vars.IMGBB_API_KEY }}" },
+          { "name": "image", "value": "={{ $input.first().json.data[0].b64_json }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "gen-imgbb", "name": "☁️ Imgbb: Host Thumbnail",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2980, 760]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev=$('🎨 Agent: Thumbnail').first().json;\nconst resp=$input.first().json;\nlet hosted='';try{hosted=resp.data.url||resp.data.display_url;}catch(e){}\nreturn [{ json:{ platform:prev.platform, source:prev.source, chatId:prev.chatId, postAtUtc:prev.postAtUtc, best_time:prev.best_time, topic:prev.topic, content_pillar:prev.content_pillar, target_audience:prev.target_audience, hook:prev.hook, cta:prev.cta, script:prev.script, scenes:prev.scenes, title:prev.title, description:prev.description, tags:prev.tags, hashtags:prev.hashtags, thumbnail_url:hosted } }];"
+      },
+      "id": "gen-assemble", "name": "🧩 Assemble Record",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3200, 760]
+    },
+
+    {
+      "parameters": { "fieldToSplitOut": "scenes", "options": {} },
+      "id": "gen-split", "name": "🎬 Split Scenes",
+      "type": "n8n-nodes-base.splitOut", "typeVersion": 1, "position": [3420, 760]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.pexels.com/videos/search?query={{ encodeURIComponent($json.broll_keyword) }}&per_page=1&orientation=portrait&size=medium",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "={{ $vars.PEXELS_API_KEY }}" }] },
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "gen-pexels", "name": "📷 Pexels: Scene B-roll",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [3640, 760]
+    },
+    {
+      "parameters": {
+        "jsCode": "// RUN ONCE FOR ALL ITEMS — build a single ffmpeg bash script\nconst master=$('🧩 Assemble Record').first().json;\nconst scenes=$('🎬 Split Scenes').all().map(i=>i.json);\nconst pex=$input.all().map(i=>i.json);\nconst KEY=$vars.OPENAI_API_KEY;\nconst FONT=$vars.FFMPEG_FONT || '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';\nconst voice=$vars.OPENAI_TTS_VOICE || 'onyx';\nconst job='v3_'+Date.now();\nconst dir='/tmp/'+job;\nconst b64=(s)=>Buffer.from(String(s||''),'utf8').toString('base64');\nfunction pickVideo(r){ try{const v=r.videos||[];if(!v.length)return '';const f=v[0].video_files||[];const port=f.filter(x=>x.height>=x.width);const pool=port.length?port:f;pool.sort((a,b)=>(b.height||0)-(a.height||0));return (pool[0]||{}).link||'';}catch(e){return '';} }\nconst L=['set -e','export DIR='+dir,'mkdir -p $DIR','cd $DIR'];\nconst list=[];\nscenes.forEach((s,i)=>{\n  const broll=pickVideo(pex[i]||{});\n  const tts=JSON.stringify({ model:'tts-1-hd', voice:voice, input: s.narration||master.topic });\n  L.push(`echo \\\"${b64(tts)}\\\" | base64 -d > tts_${i}.json`);\n  L.push(`curl -s https://api.openai.com/v1/audio/speech -H \\\"Authorization: Bearer ${KEY}\\\" -H \\\"Content-Type: application/json\\\" --data @tts_${i}.json -o voice_${i}.mp3`);\n  L.push(`echo \\\"${b64(s.on_screen_text)}\\\" | base64 -d > cap_${i}.txt`);\n  if(broll){ L.push(`curl -sL \\\"${broll}\\\" -o src_${i}.mp4`); }\n  else { L.push(`curl -sL \\\"${master.thumbnail_url}\\\" -o src_${i}.jpg`); }\n  L.push(`D=$(ffprobe -v error -show_entries format=duration -of csv=p=0 voice_${i}.mp3)`);\n  const inp = broll ? `-stream_loop -1 -t $D -i src_${i}.mp4` : `-loop 1 -t $D -i src_${i}.jpg`;\n  const vf = `scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,drawtext=fontfile=${FONT}:textfile=cap_${i}.txt:fontcolor=white:fontsize=64:line_spacing=12:box=1:boxcolor=black@0.55:boxborderw=26:x=(w-text_w)/2:y=h-560`;\n  L.push(`ffmpeg -y ${inp} -i voice_${i}.mp3 -vf \\\"${vf}\\\" -map 0:v -map 1:a -r 30 -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -b:a 192k -shortest scene_${i}.mp4`);\n  list.push(`file 'scene_${i}.mp4'`);\n});\nL.push(`printf \\\"${list.join('\\\\n')}\\\\n\\\" > list.txt`);\nL.push(`ffmpeg -y -f concat -safe 0 -i list.txt -c copy ${dir}/final.mp4`);\nL.push(`echo RENDER_DONE ${dir}/final.mp4`);\nreturn [{ json:{ ...master, job, outPath:dir+'/final.mp4', ffmpegScript:L.join('\\n') } }];"
+      },
+      "id": "gen-ffmpeg", "name": "🎞️ Build FFmpeg Job",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3860, 760]
+    },
+    {
+      "parameters": { "command": "={{ $json.ffmpegScript }}" },
+      "id": "gen-exec", "name": "🖥️ FFmpeg: Render (Execute Command)",
+      "type": "n8n-nodes-base.executeCommand", "typeVersion": 1, "position": [4080, 760]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ $('🎞️ Build FFmpeg Job').first().json.outPath }}",
+        "options": { "dataPropertyName": "data" }
+      },
+      "id": "gen-read", "name": "📂 Read Rendered MP4",
+      "type": "n8n-nodes-base.readWriteFile", "typeVersion": 1, "position": [4300, 760]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL }}/storage/v1/object/videos/{{ $('🎞️ Build FFmpeg Job').first().json.job }}.mp4",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "video/mp4" },
+          { "name": "x-upsert", "value": "true" }
+        ]},
+        "sendBody": true, "contentType": "binaryData", "inputDataFieldName": "data",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "gen-upload", "name": "☁️ Upload to Supabase Storage",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [4520, 760]
+    },
+    {
+      "parameters": {
+        "jsCode": "const m=$('🎞️ Build FFmpeg Job').first().json;\nconst publicUrl=`${$vars.SUPABASE_URL}/storage/v1/object/public/videos/${m.job}.mp4`;\n// compute scheduled_time\nfunction bestSlotUtc(platform){\n  const slotsRaw = platform==='tiktok' ? ($vars.BEST_TIMES_TIKTOK||'12:00,19:00,21:00') : ($vars.BEST_TIMES_YOUTUBE||'15:00,18:00,20:00');\n  const slots=slotsRaw.split(',').map(s=>s.trim());\n  const nowUtc=new Date();\n  for(const slot of slots){\n    const [h,mn]=slot.split(':').map(Number);\n    // slot is IST; convert to today's UTC: IST = UTC+5:30 => UTC = IST-5:30\n    const d=new Date(nowUtc);\n    d.setUTCHours(h-5, mn-30, 0, 0);\n    // normalize negative\n    const t=new Date(d.getTime());\n    if(t>nowUtc) return t.toISOString();\n  }\n  // none left today -> first slot tomorrow\n  const [h,mn]=slots[0].split(':').map(Number);\n  const d=new Date(nowUtc); d.setUTCDate(d.getUTCDate()+1); d.setUTCHours(h-5, mn-30,0,0);\n  return d.toISOString();\n}\nlet sched = m.postAtUtc && !m.best_time ? m.postAtUtc : bestSlotUtc(m.platform||'youtube');\nif(!sched) sched=bestSlotUtc(m.platform||'youtube');\nconst istStr=new Date(new Date(sched).getTime()+330*60000).toISOString().slice(0,16).replace('T',' ');\nreturn [{ json:{ platform:m.platform||'youtube', source:m.source, chat_id:String(m.chatId||''), topic:m.topic, title:m.title, description:m.description, tags:m.tags, hashtags:m.hashtags, script:m.script, scenes:m.scenes, thumbnail_url:m.thumbnail_url, video_path:m.outPath, video_url:publicUrl, status:'ready', scheduled_time:sched, scheduledIst:istStr } }];"
+      },
+      "id": "gen-final", "name": "🧮 Finalize + Schedule",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [4740, 760]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/video_queue",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "return=minimal" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ platform:$json.platform, source:$json.source, chat_id:$json.chat_id, topic:$json.topic, title:$json.title, description:$json.description, tags:$json.tags, hashtags:$json.hashtags, script:$json.script, scenes:$json.scenes, thumbnail_url:$json.thumbnail_url, video_path:$json.video_path, video_url:$json.video_url, status:'ready', scheduled_time:$json.scheduled_time }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "gen-insert", "name": "💾 Supabase: Insert Video",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [4960, 760]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('🧮 Finalize + Schedule').first().json.chat_id || $vars.TELEGRAM_CHAT_ID }}",
+        "text": "=✅ *Video ready!*\n🎬 {{ $('🧮 Finalize + Schedule').first().json.title }}\n🗓 Scheduled: {{ $('🧮 Finalize + Schedule').first().json.scheduledIst }} IST\n📺 Platform: {{ $('🧮 Finalize + Schedule').first().json.platform }}\n\nIt will auto-publish at the scheduled time.",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "gen-reply", "name": "💬 Reply: Scheduled",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [5180, 760],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "*/15 * * * *" }] } },
+      "id": "pub-trigger", "name": "⏰ Publish Queue (15min)",
+      "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [-400, 1300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/video_queue?status=eq.ready&scheduled_time=lte.{{ $now.toISO() }}&select=*&limit=5",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "pub-due", "name": "💾 Get Due Videos",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-180, 1300]
+    },
+    {
+      "parameters": { "fieldToSplitOut": "data", "options": {} },
+      "id": "pub-split", "name": "📋 Split Due",
+      "type": "n8n-nodes-base.splitOut", "typeVersion": 1, "position": [40, 1300]
+    },
+    {
+      "parameters": { "batchSize": 1, "options": {} },
+      "id": "pub-loop", "name": "🔄 Publish Each",
+      "type": "n8n-nodes-base.splitInBatches", "typeVersion": 3, "position": [260, 1300]
+    },
+    {
+      "parameters": {
+        "rules": { "values": [
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "yt", "leftValue": "={{ $json.platform }}", "rightValue": "youtube", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "youtube" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "tt", "leftValue": "={{ $json.platform }}", "rightValue": "tiktok", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "tiktok" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "bo", "leftValue": "={{ $json.platform }}", "rightValue": "both", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "both" }
+        ]}, "options": {}
+      },
+      "id": "pub-switch", "name": "🔀 Platform",
+      "type": "n8n-nodes-base.switch", "typeVersion": 3, "position": [480, 1300]
+    },
+    {
+      "parameters": { "url": "={{ $json.video_url }}", "options": { "response": { "response": { "responseFormat": "file" } } } },
+      "id": "pub-dl", "name": "⬇️ Download Video",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [720, 1180]
+    },
+    {
+      "parameters": {
+        "resource": "video", "operation": "upload",
+        "title": "={{ $('🔄 Publish Each').item.json.title }}",
+        "regionCode": "US", "categoryId": "22",
+        "options": {
+          "description": "={{ $('🔄 Publish Each').item.json.description }}\n\n{{ $('🔄 Publish Each').item.json.hashtags }}",
+          "privacyStatus": "public",
+          "tags": "={{ ($('🔄 Publish Each').item.json.tags||'').split(',') }}"
+        },
+        "binaryProperty": "data"
+      },
+      "id": "pub-yt", "name": "▶️ YouTube: Upload",
+      "type": "n8n-nodes-base.youTube", "typeVersion": 1, "position": [940, 1180],
+      "credentials": { "youTubeOAuth2Api": { "id": "YT_CRED_ID", "name": "YouTube OAuth2" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row=$('🔄 Publish Each').first().json;\nconst resp=$input.first().json;\nconst vid=resp.id||(resp.id&&resp.id.videoId)||null;\nreturn [{ json:{ id:row.id, chat_id:row.chat_id, title:row.title, status:'published', platform:'youtube', youtube_video_id:vid, tiktok_video_id:null, published_at:new Date().toISOString(), link: vid?('https://youtu.be/'+vid):'', error_notes:null } }];"
+      },
+      "id": "pub-yt-res", "name": "📋 YT Result",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1160, 1180]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://open.tiktokapis.com/v2/post/publish/video/init/",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.TIKTOK_ACCESS_TOKEN }}" },
+          { "name": "Content-Type", "value": "application/json; charset=UTF-8" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ post_info:{ title: ($('🔄 Publish Each').item.json.title + ' ' + ($('🔄 Publish Each').item.json.hashtags||'')).slice(0,150), privacy_level:'SELF_ONLY', disable_comment:false }, source_info:{ source:'PULL_FROM_URL', video_url: $('🔄 Publish Each').item.json.video_url } }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "pub-tt", "name": "🎵 TikTok: Publish",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [940, 1420]
+    },
+    {
+      "parameters": {
+        "jsCode": "const row=$('🔄 Publish Each').first().json;\nconst resp=$input.first().json;\nlet pubId=null;try{pubId=resp.data.publish_id;}catch(e){}\nconst ok=!!pubId;\nreturn [{ json:{ id:row.id, chat_id:row.chat_id, title:row.title, status: ok?'published':'failed', platform:'tiktok', youtube_video_id:null, tiktok_video_id:pubId, published_at: ok?new Date().toISOString():null, link:'', error_notes: ok?null:('TikTok publish failed: '+JSON.stringify(resp).slice(0,200)) } }];"
+      },
+      "id": "pub-tt-res", "name": "📋 TT Result",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1160, 1420]
+    },
+    {
+      "parameters": { "mode": "passThrough", "output": "input1" },
+      "id": "pub-merge", "name": "🔀 Merge Publish",
+      "type": "n8n-nodes-base.merge", "typeVersion": 3, "position": [1380, 1300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/video_queue?id=eq.{{ $json.id }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "return=minimal" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ status:$json.status, youtube_video_id:$json.youtube_video_id, tiktok_video_id:$json.tiktok_video_id, published_at:$json.published_at, error_notes:$json.error_notes }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "pub-mark", "name": "💾 Mark Published",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1600, 1300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id || $vars.TELEGRAM_CHAT_ID }}",
+        "text": "=🚀 *Published!*\n🎬 {{ $json.title }}\n📺 {{ $json.platform }}{{ $json.link ? ('\\n🔗 ' + $json.link) : '' }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "pub-notify", "name": "💬 Telegram: Posted",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [1820, 1220],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    }
+  ],
+
+  "connections": {
+    "💬 Telegram Command":        { "main": [[{ "node": "🧠 Build Intent Prompt",     "type": "main", "index": 0 }]] },
+    "🧠 Build Intent Prompt":     { "main": [[{ "node": "🤖 OpenAI: Parse Intent",     "type": "main", "index": 0 }]] },
+    "🤖 OpenAI: Parse Intent":    { "main": [[{ "node": "📋 Parse Intent",             "type": "main", "index": 0 }]] },
+    "📋 Parse Intent":            { "main": [[{ "node": "🔀 Route Action",             "type": "main", "index": 0 }]] },
+    "🔀 Route Action": { "main": [
+      [{ "node": "📥 Normalize Request (TG)", "type": "main", "index": 0 }],
+      [{ "node": "💾 Save Daily Time",        "type": "main", "index": 0 }],
+      [{ "node": "💾 Save Platform",          "type": "main", "index": 0 }],
+      [{ "node": "💾 Get Queue",              "type": "main", "index": 0 }],
+      [{ "node": "💬 Reply: Help",            "type": "main", "index": 0 }]
+    ]},
+    "💾 Save Daily Time":         { "main": [[{ "node": "💬 Reply: Time Set",          "type": "main", "index": 0 }]] },
+    "💾 Save Platform":           { "main": [[{ "node": "💬 Reply: Platform Set",      "type": "main", "index": 0 }]] },
+    "💾 Get Queue":               { "main": [[{ "node": "📋 Format Status",            "type": "main", "index": 0 }]] },
+    "📋 Format Status":           { "main": [[{ "node": "💬 Reply: Status",            "type": "main", "index": 0 }]] },
+    "📥 Normalize Request (TG)":  { "main": [[{ "node": "📈 Research: Top Performers",  "type": "main", "index": 0 }]] },
+
+    "⏰ Daily Check (Hourly)":     { "main": [[{ "node": "💾 Get Settings",             "type": "main", "index": 0 }]] },
+    "💾 Get Settings":            { "main": [[{ "node": "🕐 Is It Posting Time?",      "type": "main", "index": 0 }]] },
+    "🕐 Is It Posting Time?":     { "main": [[{ "node": "❓ Time to Generate?",         "type": "main", "index": 0 }]] },
+    "❓ Time to Generate?": { "main": [
+      [{ "node": "📥 Normalize Request (Daily)", "type": "main", "index": 0 }],
+      []
+    ]},
+    "📥 Normalize Request (Daily)": { "main": [[{ "node": "📈 Research: Top Performers", "type": "main", "index": 0 }]] },
+
+    "📈 Research: Top Performers":  { "main": [[{ "node": "🧭 Agent: Strategy",          "type": "main", "index": 0 }]] },
+    "🧭 Agent: Strategy":          { "main": [[{ "node": "🤖 OpenAI: Strategy",         "type": "main", "index": 0 }]] },
+    "🤖 OpenAI: Strategy":         { "main": [[{ "node": "✍️ Agent: Script",            "type": "main", "index": 0 }]] },
+    "✍️ Agent: Script":            { "main": [[{ "node": "🤖 OpenAI: Script",           "type": "main", "index": 0 }]] },
+    "🤖 OpenAI: Script":           { "main": [[{ "node": "🔍 Agent: SEO",               "type": "main", "index": 0 }]] },
+    "🔍 Agent: SEO":               { "main": [[{ "node": "🤖 OpenAI: SEO",              "type": "main", "index": 0 }]] },
+    "🤖 OpenAI: SEO":              { "main": [[{ "node": "🎨 Agent: Thumbnail",         "type": "main", "index": 0 }]] },
+    "🎨 Agent: Thumbnail":         { "main": [[{ "node": "🖼️ OpenAI: Thumbnail (gpt-image-1)", "type": "main", "index": 0 }]] },
+    "🖼️ OpenAI: Thumbnail (gpt-image-1)": { "main": [[{ "node": "☁️ Imgbb: Host Thumbnail", "type": "main", "index": 0 }]] },
+    "☁️ Imgbb: Host Thumbnail":    { "main": [[{ "node": "🧩 Assemble Record",          "type": "main", "index": 0 }]] },
+    "🧩 Assemble Record":          { "main": [[{ "node": "🎬 Split Scenes",             "type": "main", "index": 0 }]] },
+    "🎬 Split Scenes":             { "main": [[{ "node": "📷 Pexels: Scene B-roll",     "type": "main", "index": 0 }]] },
+    "📷 Pexels: Scene B-roll":     { "main": [[{ "node": "🎞️ Build FFmpeg Job",         "type": "main", "index": 0 }]] },
+    "🎞️ Build FFmpeg Job":        { "main": [[{ "node": "🖥️ FFmpeg: Render (Execute Command)", "type": "main", "index": 0 }]] },
+    "🖥️ FFmpeg: Render (Execute Command)": { "main": [[{ "node": "📂 Read Rendered MP4", "type": "main", "index": 0 }]] },
+    "📂 Read Rendered MP4":        { "main": [[{ "node": "☁️ Upload to Supabase Storage", "type": "main", "index": 0 }]] },
+    "☁️ Upload to Supabase Storage": { "main": [[{ "node": "🧮 Finalize + Schedule",    "type": "main", "index": 0 }]] },
+    "🧮 Finalize + Schedule":      { "main": [[{ "node": "💾 Supabase: Insert Video",   "type": "main", "index": 0 }]] },
+    "💾 Supabase: Insert Video":   { "main": [[{ "node": "💬 Reply: Scheduled",         "type": "main", "index": 0 }]] },
+
+    "⏰ Publish Queue (15min)":    { "main": [[{ "node": "💾 Get Due Videos",           "type": "main", "index": 0 }]] },
+    "💾 Get Due Videos":           { "main": [[{ "node": "📋 Split Due",                "type": "main", "index": 0 }]] },
+    "📋 Split Due":                { "main": [[{ "node": "🔄 Publish Each",             "type": "main", "index": 0 }]] },
+    "🔄 Publish Each":             { "main": [[{ "node": "🔀 Platform",                 "type": "main", "index": 0 }]] },
+    "🔀 Platform": { "main": [
+      [{ "node": "⬇️ Download Video",  "type": "main", "index": 0 }],
+      [{ "node": "🎵 TikTok: Publish", "type": "main", "index": 0 }],
+      [{ "node": "⬇️ Download Video",  "type": "main", "index": 0 }, { "node": "🎵 TikTok: Publish", "type": "main", "index": 0 }]
+    ]},
+    "⬇️ Download Video":           { "main": [[{ "node": "▶️ YouTube: Upload",          "type": "main", "index": 0 }]] },
+    "▶️ YouTube: Upload":          { "main": [[{ "node": "📋 YT Result",                "type": "main", "index": 0 }]] },
+    "📋 YT Result":                { "main": [[{ "node": "🔀 Merge Publish",            "type": "main", "index": 0 }]] },
+    "🎵 TikTok: Publish":          { "main": [[{ "node": "📋 TT Result",                "type": "main", "index": 0 }]] },
+    "📋 TT Result":                { "main": [[{ "node": "🔀 Merge Publish",            "type": "main", "index": 1 }]] },
+    "🔀 Merge Publish":            { "main": [[{ "node": "💾 Mark Published",           "type": "main", "index": 0 }]] },
+    "💾 Mark Published":           { "main": [[
+      { "node": "💬 Telegram: Posted", "type": "main", "index": 0 },
+      { "node": "🔄 Publish Each",     "type": "main", "index": 0 }
+    ]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true },
+  "id": "wf-youtube-tiktok-v3",
+  "tags": [{ "id": "video-ai", "name": "Video AI" }]
+}

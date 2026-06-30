@@ -5,7 +5,7 @@ This repo contains **two** all-in-one n8n automation workflows, both backed by *
 | Workflow | File | What it does |
 |----------|------|--------------|
 | 📌 **Pinterest** | `workflows/pinterest_ai_complete.json` | Trends → ideas → DALL-E images → SEO copy → post (Pinterest API **or** Buffer toggle) |
-| 🎬 **YouTube + TikTok** | `workflows/youtube_tiktok_v2.json` | Data-driven strategy → multi-scene script → b-roll video → publish to YouTube **and/or** TikTok (API or Buffer) |
+| 🎬 **YouTube + TikTok** | `workflows/youtube_tiktok_v3_ffmpeg_telegram.json` | ⭐ **v3** — Telegram bot + FFmpeg rendering, OpenAI-only, schedule by IST time |
 
 Jump to: [Pinterest](#-pinterest-automation) · [YouTube + TikTok](#-youtube--tiktok-automation)
 
@@ -206,9 +206,10 @@ Trial Access for testing; Buffer mode is unaffected by this.
 
 ## 🎬 YouTube + TikTok Automation
 
-> **Two versions available:**
-> - **`youtube_tiktok_v2.json`** ⭐ **recommended** — smarter, data-driven strategy + multi-scene video
-> - `youtube_tiktok_complete.json` — original single-image version (kept for reference)
+> **Three versions available:**
+> - **`youtube_tiktok_v3_ffmpeg_telegram.json`** ⭐⭐ **newest** — interactive **Telegram bot** + **FFmpeg** rendering (no JSON2Video), **OpenAI-only**, schedule by IST time
+> - `youtube_tiktok_v2.json` — data-driven strategy + multi-scene (JSON2Video render)
+> - `youtube_tiktok_complete.json` — original single-image version (reference)
 
 A second all-in-one workflow that creates and publishes **short-form videos** to YouTube and/or TikTok automatically. It's modeled on the multi-agent architecture from [darkzOGx/youtube-automation-agent](https://github.com/darkzOGx/youtube-automation-agent), rebuilt for n8n with a TikTok publishing path added. *(Architecture notes were summarized/rephrased for licensing compliance.)*
 
@@ -223,6 +224,33 @@ A second all-in-one workflow that creates and publishes **short-form videos** to
 | **Per-scene** | — | Each scene has its own narration, caption, and b-roll keyword |
 
 v2 needs the extra schema columns — run [`config/video_supabase_schema_v2.sql`](config/video_supabase_schema_v2.sql) **after** the base schema, and add `PEXELS_API_KEY`.
+
+### ⭐⭐ v3 — Telegram bot + FFmpeg (newest, OpenAI-only, near-free)
+
+The newest version is **controlled entirely from Telegram** and renders video with **FFmpeg** on your own server (no JSON2Video subscription). Full guide: [`config/video_v3_setup.md`](config/video_v3_setup.md).
+
+**Talk to it in plain English (times are IST):**
+- _"make a video about morning routines, post at best time"_
+- _"create a short on saving money, post tomorrow 7pm"_
+- _"set daily posting time to 18:30"_ → auto-posts daily at that time
+- _"set platform to both"_ · _"status"_
+
+**Three triggers:** `💬 Telegram Command` (on-demand) · `⏰ Daily Check` (hourly, fires at your set IST time) · `⏰ Publish Queue` (every 15 min, publishes when due).
+
+**Premium agents (OpenAI only):**
+- **Script** — gpt-4o, pattern-interrupt hook → value beats → payoff → CTA
+- **Thumbnail** — `gpt-image-1` (replaces deprecated DALL-E 3)
+- **Voiceover** — `tts-1-hd`
+- **Video** — FFmpeg stitches Pexels b-roll + voice + burned captions → vertical 1080×1920 MP4 → Supabase Storage
+
+| | v3 |
+|---|---|
+| Render | **FFmpeg** (self-hosted, $0) |
+| Control | **Telegram bot** + scheduled |
+| Cost | ~$0.10–0.25/video (OpenAI only) |
+| Requires | **self-hosted n8n** with ffmpeg/curl |
+
+> ⚠️ v3 needs **self-hosted n8n** (FFmpeg can't run on n8n Cloud). Run all three schema files (`_v2`, `_v3`) and create a public Supabase Storage bucket named `videos`.
 
 
 ### 🤝 The Agent Pipeline (mirrors the original 7 agents)
@@ -291,11 +319,14 @@ idea → rendering (JSON2Video) → ready → published → (analytics)
 
 ### 📁 Video Automation Files
 ```
-workflows/youtube_tiktok_v2.json         ← ⭐ recommended (data-driven, multi-scene)
-workflows/youtube_tiktok_complete.json   ← original version (reference)
-config/video_supabase_schema.sql         ← Supabase tables (run once)
-config/video_supabase_schema_v2.sql      ← v2 extra columns (run after base, for v2)
-config/video_variables.md                ← variables + credentials guide
+workflows/youtube_tiktok_v3_ffmpeg_telegram.json  ← ⭐⭐ newest (Telegram + FFmpeg, OpenAI-only)
+workflows/youtube_tiktok_v2.json                  ← data-driven, multi-scene (JSON2Video)
+workflows/youtube_tiktok_complete.json            ← original version (reference)
+config/video_supabase_schema.sql                  ← base Supabase tables
+config/video_supabase_schema_v2.sql               ← v2 extra columns
+config/video_supabase_schema_v3.sql               ← v3 settings table + storage cols
+config/video_variables.md                         ← v1/v2 variables guide
+config/video_v3_setup.md                           ← v3 Telegram + FFmpeg full setup
 ```
 
 ---
