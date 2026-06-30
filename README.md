@@ -1,4 +1,17 @@
-# 🤖 Pinterest AI Automation — All-in-One n8n Workflow
+# 🤖 Social Media AI Automation — n8n Workflows
+
+This repo contains **two** all-in-one n8n automation workflows, both backed by **Supabase**:
+
+| Workflow | File | What it does |
+|----------|------|--------------|
+| 📌 **Pinterest** | `workflows/pinterest_ai_complete.json` | Trends → ideas → DALL-E images → SEO copy → post (Pinterest API **or** Buffer toggle) |
+| 🎬 **YouTube + TikTok** | `workflows/youtube_tiktok_complete.json` | Strategy → script → thumbnail → AI video render → publish to YouTube **and/or** TikTok |
+
+Jump to: [Pinterest](#-pinterest-automation) · [YouTube + TikTok](#-youtube--tiktok-automation)
+
+---
+
+## 📌 Pinterest Automation
 
 A fully automated Pinterest content machine in a **single n8n workflow**. It discovers trends, writes ideas, generates images with DALL-E 3, writes SEO copy, and posts to Pinterest — with a **toggle** to switch between posting via the **Pinterest API** or **Buffer**. Data is stored in **Supabase**.
 
@@ -187,3 +200,82 @@ Trial Access for testing; Buffer mode is unaffected by this.
 ---
 
 *Built with ❤️ — a single-workflow, toggle-driven Pinterest content machine.*
+
+
+---
+
+## 🎬 YouTube + TikTok Automation
+
+A second all-in-one workflow (`workflows/youtube_tiktok_complete.json`) that creates and publishes **short-form videos** to YouTube and/or TikTok automatically. It's modeled on the multi-agent architecture from [darkzOGx/youtube-automation-agent](https://github.com/darkzOGx/youtube-automation-agent), rebuilt for n8n with a TikTok publishing path added. *(Architecture notes were summarized/rephrased for licensing compliance.)*
+
+### 🤝 The Agent Pipeline (mirrors the original 7 agents)
+
+| Agent | Role | Implemented with |
+|-------|------|------------------|
+| 1. Content Strategy | Picks a trending short-form topic + hook | OpenAI GPT-4o-mini |
+| 2. Script Writer | Writes 30-45s narration + caption lines | OpenAI |
+| 4. SEO Optimizer | Title, description, tags, hashtags | OpenAI |
+| 3. Thumbnail Designer | Generates thumbnail | DALL-E 3 → Imgbb |
+| 5. Production | Renders the video (image + TTS voice + captions) | JSON2Video |
+| 6. Publishing | Uploads on schedule | YouTube Data API v3 / TikTok Content Posting API |
+| 7. Analytics & Strategy | Daily stats + weekly review | OpenAI + Supabase |
+
+### 🎛️ Platform Toggle
+
+Open the **⚙️ CONTROL PANEL** node and set `platform`:
+
+| Value | Result |
+|-------|--------|
+| `youtube` | Publish to YouTube only |
+| `tiktok` | Publish to TikTok only |
+| `both` | Publish to YouTube **and** TikTok |
+
+Other toggles: `videosPerRun`, `bufferDays` (smart buffer — skip generating if enough queued), `niche`, `videoStyle`, `scheduleHour`, `enabled` (master switch).
+
+### ⏰ Four Schedules (same cadence as the original agent)
+
+| Trigger | Cron | Purpose |
+|---------|------|---------|
+| Content Gen | `0 6 * * *` | Generate new videos daily (respects buffer) |
+| Publish Queue | `*/15 * * * *` | Check renders + publish due videos |
+| Analytics | `0 9 * * *` | Collect views/likes/comments |
+| Weekly Strategy | `0 8 * * 0` | Review top performers, suggest next topics |
+
+### 🔄 Video Pipeline Flow
+
+```
+idea → rendering (JSON2Video) → ready → published → (analytics)
+```
+
+### 🚀 Setup
+1. Run [`config/video_supabase_schema.sql`](config/video_supabase_schema.sql) in Supabase
+2. Set the variables in [`config/video_variables.md`](config/video_variables.md)
+   (OpenAI, Imgbb, JSON2Video, Supabase, TikTok token)
+3. Create a **YouTube OAuth2** credential and select it in the YouTube nodes
+4. Import `workflows/youtube_tiktok_complete.json`
+5. Set the **⚙️ CONTROL PANEL** toggle (`youtube` / `tiktok` / `both`)
+6. Activate
+
+### ⚠️ Important Notes
+- **TikTok:** unaudited apps can only post privately (`SELF_ONLY`). Pass TikTok's app
+  audit to publish publicly, then change `privacy_level` in the **🎵 TikTok: Publish** node.
+  `PULL_FROM_URL` also requires a verified domain in the TikTok developer portal.
+- **Video rendering** uses JSON2Video (built-in TTS voice) — no separate voiceover service
+  needed. Swap the voice/style in the **🎬 Agent5: Build Render Job** node.
+- **YouTube quota:** uploads cost ~1600 quota units each; the default 10k/day quota allows
+  ~6 uploads/day unless you request more.
+
+### 📁 Video Automation Files
+```
+workflows/youtube_tiktok_complete.json   ← the all-in-one video workflow
+config/video_supabase_schema.sql         ← Supabase tables (run once)
+config/video_variables.md                ← variables + credentials guide
+```
+
+---
+
+## 🙏 Credits
+
+The YouTube + TikTok workflow's agent architecture is inspired by
+[darkzOGx/youtube-automation-agent](https://github.com/darkzOGx/youtube-automation-agent)
+by Haithum Abdelfattah.
