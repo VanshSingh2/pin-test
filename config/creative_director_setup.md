@@ -13,6 +13,7 @@
 | **Pick what to make** | "make a carousel / image / reel about X" → it sets `content_type` |
 | **Pick the style** | "use Disney Pixar 3D" / "moody cinematic" → applied to every asset |
 | **AI visuals OR Pinterest** | `visual_source = ai` (AI images) · `pexels` · `pinterest` — Pinterest gives **scraped clips** for video and **scraped images** for image/carousel |
+| **Render engine (video)** | `render_engine = ffmpeg` (fast, default) · `hyperframes` (HTML motion graphics — nicer captions/transitions, needs Node 22 + Chrome libs on the host; see `hyperframes_vps_setup.md`) |
 | **Pinterest-style search** | "find clips like dark moody gym" → sets `reference`, searches Pinterest/Pexels with it |
 | **Choose the AI model** | "use flux for images" / set `image_model` (any OpenRouter image model) |
 | **Give a script or topic** | paste a script, or just a topic — it writes one |

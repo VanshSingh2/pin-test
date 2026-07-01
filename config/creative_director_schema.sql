@@ -51,3 +51,8 @@ alter table cd_memory disable row level security;
 alter table cd_state add column if not exists history jsonb default '[]'::jsonb;
 -- Set n8n variable BUFFER_PROFILE_ID_FACEBOOK to your Facebook page profile id in Buffer.
 -- platform now accepts: instagram | youtube | tiktok | pinterest | facebook | both
+
+
+-- Render engine choice (video): ffmpeg (fast clips/stills + captions) or hyperframes (HTML motion graphics)
+alter table cd_state add column if not exists render_engine text default 'ffmpeg';
+-- HyperFrames requires Node 22+, FFmpeg and headless-Chrome libs on the n8n host (see config/hyperframes_vps_setup.md)
