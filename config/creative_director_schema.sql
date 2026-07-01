@@ -80,3 +80,18 @@ create table if not exists cd_scheduled (
 );
 create index if not exists cd_scheduled_due_idx on cd_scheduled (status, due_at);
 alter table cd_scheduled disable row level security;
+
+
+
+-- ------------------------------------------------------------
+-- Added later: ANALYTICS feedback loop
+-- ------------------------------------------------------------
+-- Every 6h the "Analytics Trigger" pulls each Buffer-posted update's stats,
+-- scores it, and writes the top performers back into cd_state.winners so the
+-- Master Brief doubles down on what actually works.
+alter table cd_memory add column if not exists buffer_id text;             -- Buffer update id (for stats lookup)
+alter table cd_memory add column if not exists metrics jsonb;              -- {likes,comments,shares,saves,reach,clicks}
+alter table cd_memory add column if not exists score numeric default 0;    -- weighted engagement score
+alter table cd_memory add column if not exists metrics_updated_at timestamptz;
+
+alter table cd_state  add column if not exists winners text default '';     -- short summary of top-performing topics/styles

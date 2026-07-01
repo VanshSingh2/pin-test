@@ -30,7 +30,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const intake=$('🧠 Intake').first().json;\nconst rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nconst s=rows[0]||{};\nconst d={ niche:s.niche||'', style:s.style||'', platform:s.platform||'instagram', content_type:s.content_type||'video', visual_source:s.visual_source||'ai', image_model:s.image_model||'openai/gpt-image-1', video_model:s.video_model||'google/veo-3.1-lite', posting_method:s.posting_method||'buffer', render_engine:s.render_engine||'ffmpeg', reference:s.reference||'', post_mode:s.post_mode||'now', post_time:s.post_time||'', brand_bible:s.brand_bible||'', pending:s.pending_action||null, history:(s.history||[]) }; const convo=(d.history||[]).slice(-20).map(h=>'U: '+h.u+' / A: '+h.a).join(' || ');\nconst sys=`You are a world-class Creative Director running a multi-platform content studio for one creator. You chat naturally, remember the recent conversation, keep everything ON-BRAND using the brand memory, and ALWAYS CONFIRM before creating. Supported platforms: instagram, youtube, tiktok, pinterest, facebook, both. Video render engines: ffmpeg (fast; clips/stills + captions) or hyperframes (HTML motion graphics, higher quality) — to change it return set_render_engine with value ffmpeg or hyperframes. Scheduling: to post later say e.g. 'post at 7pm' or 'schedule daily at 19:30' => set_post_mode=scheduled and set_post_time as 24h IST HH:MM; for immediate say 'post now' => set_post_mode=now. Recent conversation: ${convo||'(first message)'}.\\n\\nCurrent settings:\\n- niche: \\\"${d.niche||'(not set)'}\\\"\\n- style: \\\"${d.style||'(not set)'}\\\"\\n- platform: ${d.platform}\\n- content_type: ${d.content_type}\\n- visual_source: ${d.visual_source} (ai = AI-generated visuals; pexels/pinterest = real stock clips or images; ai_video = AI-generated motion clips via image-to-video model)\\n- image_model: ${d.image_model}\\n- video_model: ${d.video_model}\\n- posting_method: ${d.posting_method} (buffer or api)\\n- reference (clip search phrase): \\\"${d.reference||'(none)'}\\\"\\n- post_mode: ${d.post_mode} (now = post right after approval; scheduled = queue until post_time)\\n- post_time: \\\"${d.post_time||'(not set)'}\\\" (IST 24h HH:MM, e.g. 19:30)\\n- BRAND BIBLE (keep new work consistent with this): \\\"${d.brand_bible||'(empty — first creation)'}\\\"\\n- pending action: ${d.pending?JSON.stringify(d.pending):'(none)'}\\n\\nYou understand free-form requests. The user can set any of: niche, style, platform, content_type (image|carousel|video), visual_source (ai|pexels|pinterest), image_model, video_model, posting_method (buffer|api), reference. They can also paste a SCRIPT to use, or ask you to decide as the specialist.\\n\\nRules:\\n- If they change any setting => intent=set_config and fill the matching set_* fields (only the ones mentioned).\\n- If they ask to CREATE => intent=propose. Fill action {content_type, platform, topic, script, slide_count, visual_source, posting_method}. Use current settings as defaults; if they didn't specify posting method, you MAY ask in the reply (e.g. 'post via Buffer or API?'). Write a short plan and ask them to reply 'yes'.\\n- Confirm (yes/go/make it) with a pending action => intent=confirm.\\n- cancel => intent=cancel. If they ask to see/show settings, reply (intent=chat) listing current niche, style, platform, visual_source, image_model and posting_method. If they're unsure what to make, suggest 2-3 on-brand ideas that fit the niche+style. Else intent=chat.\\n- If niche or style is missing when creating, ask them to set it first (intent=chat).\\nRespond STRICT JSON only.`;\nconst usr=`User: \\\"${intake.text}\\\"\\nReturn JSON: {\\n \\\"reply\\\":\\\"natural reply\\\",\\n \\\"intent\\\":\\\"set_config|propose|confirm|cancel|chat\\\",\\n \\\"set_niche\\\":\\\"\\\",\\\"set_style\\\":\\\"\\\",\\\"set_platform\\\":\\\"\\\",\\\"set_content_type\\\":\\\"\\\",\\\"set_visual_source\\\":\\\"\\\",\\\"set_image_model\\\":\\\"\\\",\\\"set_video_model\\\":\\\"\\\",\\\"set_posting_method\\\":\\\"\\\",\\\"set_reference\\\":\\\"\\\",\\\"set_post_mode\\\":\\\"\\\",\\\"set_post_time\\\":\\\"\\\",\\n \\\"content_type\\\":\\\"\\\",\\\"platform\\\":\\\"\\\",\\\"topic\\\":\\\"\\\",\\\"script\\\":\\\"\\\",\\\"slide_count\\\":5,\\\"visual_source\\\":\\\"\\\",\\\"posting_method\\\":\\\"\\\"\\n}`;\nreturn [{ json:{ chatId:intake.chatId, d, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:900 } } }];"
+        "jsCode": "const intake=$('🧠 Intake').first().json;\nconst rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nconst s=rows[0]||{};\nconst d={ niche:s.niche||'', style:s.style||'', platform:s.platform||'instagram', content_type:s.content_type||'video', visual_source:s.visual_source||'ai', image_model:s.image_model||'openai/gpt-image-1', video_model:s.video_model||'google/veo-3.1-lite', posting_method:s.posting_method||'buffer', render_engine:s.render_engine||'ffmpeg', reference:s.reference||'', post_mode:s.post_mode||'now', post_time:s.post_time||'', winners:s.winners||'', brand_bible:s.brand_bible||'', pending:s.pending_action||null, history:(s.history||[]) }; const convo=(d.history||[]).slice(-20).map(h=>'U: '+h.u+' / A: '+h.a).join(' || ');\nconst sys=`You are a world-class Creative Director running a multi-platform content studio for one creator. You chat naturally, remember the recent conversation, keep everything ON-BRAND using the brand memory, and ALWAYS CONFIRM before creating. Supported platforms: instagram, youtube, tiktok, pinterest, facebook, both. Video render engines: ffmpeg (fast; clips/stills + captions) or hyperframes (HTML motion graphics, higher quality) — to change it return set_render_engine with value ffmpeg or hyperframes. Scheduling: to post later say e.g. 'post at 7pm' or 'schedule daily at 19:30' => set_post_mode=scheduled and set_post_time as 24h IST HH:MM; for immediate say 'post now' => set_post_mode=now. Recent conversation: ${convo||'(first message)'}.\\n\\nCurrent settings:\\n- niche: \\\"${d.niche||'(not set)'}\\\"\\n- style: \\\"${d.style||'(not set)'}\\\"\\n- platform: ${d.platform}\\n- content_type: ${d.content_type}\\n- visual_source: ${d.visual_source} (ai = AI-generated visuals; pexels/pinterest = real stock clips or images; ai_video = AI-generated motion clips via image-to-video model)\\n- image_model: ${d.image_model}\\n- video_model: ${d.video_model}\\n- posting_method: ${d.posting_method} (buffer or api)\\n- reference (clip search phrase): \\\"${d.reference||'(none)'}\\\"\\n- post_mode: ${d.post_mode} (now = post right after approval; scheduled = queue until post_time)\\n- post_time: \\\"${d.post_time||'(not set)'}\\\" (IST 24h HH:MM, e.g. 19:30)\\n- BRAND BIBLE (keep new work consistent with this): \\\"${d.brand_bible||'(empty — first creation)'}\\\"\\n- pending action: ${d.pending?JSON.stringify(d.pending):'(none)'}\\n\\nTop-performing past posts (lean into these winning angles/styles when it fits the niche): ${d.winners||'(no analytics yet)'}.\\n\\nYou understand free-form requests. The user can set any of: niche, style, platform, content_type (image|carousel|video), visual_source (ai|pexels|pinterest), image_model, video_model, posting_method (buffer|api), reference. They can also paste a SCRIPT to use, or ask you to decide as the specialist.\\n\\nRules:\\n- If they change any setting => intent=set_config and fill the matching set_* fields (only the ones mentioned).\\n- If they ask to CREATE => intent=propose. Fill action {content_type, platform, topic, script, slide_count, visual_source, posting_method}. Use current settings as defaults; if they didn't specify posting method, you MAY ask in the reply (e.g. 'post via Buffer or API?'). Write a short plan and ask them to reply 'yes'.\\n- Confirm (yes/go/make it) with a pending action => intent=confirm.\\n- cancel => intent=cancel. If they ask to see/show settings, reply (intent=chat) listing current niche, style, platform, visual_source, image_model and posting_method. If they're unsure what to make, suggest 2-3 on-brand ideas that fit the niche+style. Else intent=chat.\\n- If niche or style is missing when creating, ask them to set it first (intent=chat).\\nRespond STRICT JSON only.`;\nconst usr=`User: \\\"${intake.text}\\\"\\nReturn JSON: {\\n \\\"reply\\\":\\\"natural reply\\\",\\n \\\"intent\\\":\\\"set_config|propose|confirm|cancel|chat\\\",\\n \\\"set_niche\\\":\\\"\\\",\\\"set_style\\\":\\\"\\\",\\\"set_platform\\\":\\\"\\\",\\\"set_content_type\\\":\\\"\\\",\\\"set_visual_source\\\":\\\"\\\",\\\"set_image_model\\\":\\\"\\\",\\\"set_video_model\\\":\\\"\\\",\\\"set_posting_method\\\":\\\"\\\",\\\"set_reference\\\":\\\"\\\",\\\"set_post_mode\\\":\\\"\\\",\\\"set_post_time\\\":\\\"\\\",\\n \\\"content_type\\\":\\\"\\\",\\\"platform\\\":\\\"\\\",\\\"topic\\\":\\\"\\\",\\\"script\\\":\\\"\\\",\\\"slide_count\\\":5,\\\"visual_source\\\":\\\"\\\",\\\"posting_method\\\":\\\"\\\"\\n}`;\nreturn [{ json:{ chatId:intake.chatId, d, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:900 } } }];"
       },
       "id": "cd-brain-build", "name": "🧠 Director Brain Prompt",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-40, 500]
@@ -52,7 +52,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx=$('🧠 Director Brain Prompt').first().json;const d=ctx.d;const p=d.pending||{};\nlet o={};try{o=JSON.parse($input.first().json.choices[0].message.content);}catch(e){const mm=((($input.first().json.choices||[{}])[0].message||{}).content||'').match(/\\{[\\s\\S]*\\}/);if(mm)o=JSON.parse(mm[0]);}\nconst pick=(a,b,c)=>a||b||c||'';\nreturn [{ json:{\n  chatId:ctx.chatId, reply:o.reply||'On it!', intent:o.intent||'chat',\n  niche:d.niche, style:d.style, brand_bible:d.brand_bible,\n  set_niche:o.set_niche||'', set_style:o.set_style||'', set_platform:o.set_platform||'', set_content_type:o.set_content_type||'', set_visual_source:o.set_visual_source||'', set_image_model:o.set_image_model||'', set_video_model:o.set_video_model||'', set_posting_method:o.set_posting_method||'', set_reference:o.set_reference||'', set_render_engine:o.set_render_engine||'', render_engine:d.render_engine, set_post_mode:o.set_post_mode||'', set_post_time:o.set_post_time||'', post_mode:d.post_mode, post_time:d.post_time,\n  platform: pick(o.platform, p.platform, d.platform),\n  content_type: pick(o.content_type, p.content_type, d.content_type),\n  visual_source: pick(o.visual_source, p.visual_source, d.visual_source),\n  posting_method: pick(o.posting_method, p.posting_method, d.posting_method),\n  image_model:d.image_model, video_model:d.video_model, reference:d.reference,\n  topic: pick(o.topic, p.topic, ''), script: pick(o.script, p.script, ''),\n  slide_count: Number(o.slide_count||p.slide_count||5)\n} }];"
+        "jsCode": "const ctx=$('🧠 Director Brain Prompt').first().json;const d=ctx.d;const p=d.pending||{};\nlet o={};try{o=JSON.parse($input.first().json.choices[0].message.content);}catch(e){const mm=((($input.first().json.choices||[{}])[0].message||{}).content||'').match(/\\{[\\s\\S]*\\}/);if(mm)o=JSON.parse(mm[0]);}\nconst pick=(a,b,c)=>a||b||c||'';\nreturn [{ json:{\n  chatId:ctx.chatId, reply:o.reply||'On it!', intent:o.intent||'chat',\n  niche:d.niche, style:d.style, brand_bible:d.brand_bible,\n  set_niche:o.set_niche||'', set_style:o.set_style||'', set_platform:o.set_platform||'', set_content_type:o.set_content_type||'', set_visual_source:o.set_visual_source||'', set_image_model:o.set_image_model||'', set_video_model:o.set_video_model||'', set_posting_method:o.set_posting_method||'', set_reference:o.set_reference||'', set_render_engine:o.set_render_engine||'', render_engine:d.render_engine, set_post_mode:o.set_post_mode||'', set_post_time:o.set_post_time||'', post_mode:d.post_mode, post_time:d.post_time,\n  platform: pick(o.platform, p.platform, d.platform),\n  content_type: pick(o.content_type, p.content_type, d.content_type),\n  visual_source: pick(o.visual_source, p.visual_source, d.visual_source),\n  posting_method: pick(o.posting_method, p.posting_method, d.posting_method),\n  image_model:d.image_model, video_model:d.video_model, reference:d.reference,\n  topic: pick(o.topic, p.topic, ''), script: pick(o.script, p.script, ''),\n  slide_count: Number(o.slide_count||p.slide_count||5), winners:d.winners\n} }];"
       },
       "id": "cd-brain-parse", "name": "📋 Parse Director",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [400, 500]
@@ -147,7 +147,7 @@
 
     {
       "parameters": {
-        "jsCode": "const m=$json;\nconst job='cd_'+Date.now();\nconst sys=`You are an elite Creative Director and social-media growth specialist. You produce a MASTER CREATIVE BRIEF — engineered for scroll-stopping hooks, watch-time/retention, and saves+shares on the target platform — that downstream image AND video generators follow EXACTLY. In this single pass act as FIVE specialists: (1) Trend Strategist — make the topic timely, specific and fresh, never generic; (2) Script Writer — hook (1-2s pattern interrupt) -> value beats -> payoff -> CTA; (3) Script Doctor — self-review and rewrite any weak line before returning; (4) Art Director — a high-CTR thumbnail/cover direction plus cohesive per-scene visuals; (5) Music Supervisor — choose a background-music mood. Lock visual consistency to the brand bible. Respond STRICT JSON only.${m.revision_feedback?(' A REVISION WAS REQUESTED — apply it exactly and keep everything else on-brand: '+m.revision_feedback):''}`;\nconst usr=`Niche: ${m.niche}\\nStyle: ${m.style}\\nPlatform: ${m.platform}\\nContent type: ${m.content_type}\\nVisual source: ${m.visual_source}\\nExisting brand bible (stay consistent with this): \\\"${m.brand_bible||'(none yet — establish it)'}\\\"\\nTopic: ${m.topic}\\nProvided script (may be empty): \\\"${m.script||''}\\\"\\nSlide count (carousel): ${m.slide_count}\\n\\nReturn JSON:\\n{\\n \\\"style_bible\\\": \\\"1-2 sentences locking palette, lighting, mood, composition, recurring motifs, font feel — reusable for every asset\\\",\\n \\\"updated_brand_bible\\\": \\\"the evolved brand bible to remember for next time (<= 320 chars)\\\",\\n \\\"caption\\\": \\\"platform-ready caption with hook + CTA + relevant hashtags\\\",\\n \\\"title\\\": \\\"<=90 char title (for video/pin)\\\",\\n \\\"hashtags\\\": \\\"space-separated #tags\\\",\\n \\\"image_prompt\\\": \\\"single hero image prompt (for image content)\\\",\\n \\\"slides\\\": [{\\\"headline\\\":\\\"\\\",\\\"image_prompt\\\":\\\"\\\"}],\\n \\\"scenes\\\": [{\\\"narration\\\":\\\"\\\",\\\"on_screen_text\\\":\\\"<=6 words\\\",\\\"image_prompt\\\":\\\"still-frame, vertical 9:16\\\",\\\"motion_prompt\\\":\\\"camera/subject motion\\\",\\\"broll_keyword\\\":\\\"clip search term\\\"}]\\n}\\nQuality bar for outstanding results: the hook (first line / first scene) must stop the scroll in 1-2 seconds (curiosity gap, bold claim, or pattern interrupt); the caption must be native to the platform with a hook line + value + a clear CTA (save/follow/comment); include 8-15 hashtags (mix of broad + niche); keep the topic fresh and specific. Every image_prompt MUST embed the style so all assets look cohesive and on-brand. For video provide 4-5 scenes; for carousel provide ${m.slide_count} slides.`;\nreturn [{ json:{ ...m, job, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.8, max_tokens:2000 } } }];"
+        "jsCode": "const m=$json;\nconst job='cd_'+Date.now();\nconst sys=`You are an elite Creative Director and social-media growth specialist. You produce a MASTER CREATIVE BRIEF — engineered for scroll-stopping hooks, watch-time/retention, and saves+shares on the target platform — that downstream image AND video generators follow EXACTLY. In this single pass act as FIVE specialists: (1) Trend Strategist — make the topic timely, specific and fresh, never generic; (2) Script Writer — hook (1-2s pattern interrupt) -> value beats -> payoff -> CTA; (3) Script Doctor — self-review and rewrite any weak line before returning; (4) Art Director — a high-CTR thumbnail/cover direction plus cohesive per-scene visuals; (5) Music Supervisor — choose a background-music mood. Lock visual consistency to the brand bible. Respond STRICT JSON only.${m.winners?(' Historically top-performing angles/styles to lean into when relevant: '+m.winners+'.'):''}${m.revision_feedback?(' A REVISION WAS REQUESTED — apply it exactly and keep everything else on-brand: '+m.revision_feedback):''}`;\nconst usr=`Niche: ${m.niche}\\nStyle: ${m.style}\\nPlatform: ${m.platform}\\nContent type: ${m.content_type}\\nVisual source: ${m.visual_source}\\nExisting brand bible (stay consistent with this): \\\"${m.brand_bible||'(none yet — establish it)'}\\\"\\nTopic: ${m.topic}\\nProvided script (may be empty): \\\"${m.script||''}\\\"\\nSlide count (carousel): ${m.slide_count}\\n\\nReturn JSON:\\n{\\n \\\"style_bible\\\": \\\"1-2 sentences locking palette, lighting, mood, composition, recurring motifs, font feel — reusable for every asset\\\",\\n \\\"updated_brand_bible\\\": \\\"the evolved brand bible to remember for next time (<= 320 chars)\\\",\\n \\\"caption\\\": \\\"platform-ready caption with hook + CTA + relevant hashtags\\\",\\n \\\"title\\\": \\\"<=90 char title (for video/pin)\\\",\\n \\\"hashtags\\\": \\\"space-separated #tags\\\",\\n \\\"image_prompt\\\": \\\"single hero image prompt (for image content)\\\",\\n \\\"slides\\\": [{\\\"headline\\\":\\\"\\\",\\\"image_prompt\\\":\\\"\\\"}],\\n \\\"scenes\\\": [{\\\"narration\\\":\\\"\\\",\\\"on_screen_text\\\":\\\"<=6 words\\\",\\\"image_prompt\\\":\\\"still-frame, vertical 9:16\\\",\\\"motion_prompt\\\":\\\"camera/subject motion\\\",\\\"broll_keyword\\\":\\\"clip search term\\\"}]\\n}\\nQuality bar for outstanding results: the hook (first line / first scene) must stop the scroll in 1-2 seconds (curiosity gap, bold claim, or pattern interrupt); the caption must be native to the platform with a hook line + value + a clear CTA (save/follow/comment); include 8-15 hashtags (mix of broad + niche); keep the topic fresh and specific. Every image_prompt MUST embed the style so all assets look cohesive and on-brand. For video provide 4-5 scenes; for carousel provide ${m.slide_count} slides.`;\nreturn [{ json:{ ...m, job, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.8, max_tokens:2000 } } }];"
       },
       "id": "cd-brief-build", "name": "🎯 Master Brief Prompt",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [900, 880]
@@ -469,7 +469,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const m=$('📝 Buffer: Build Post').first().json;\nreturn [{ json:{ chatId:m.chatId, kind:m.kind, platform:m.platform, topic:m.topic, style:m.style, caption:m.caption, media_urls:m.media_urls, visual_source:m.visual_source||'', __sched_id:(m.__sched_id||''), link:'Queued in Buffer ('+m.platform+')' } }];"
+        "jsCode": "const m=$('📝 Buffer: Build Post').first().json;\nconst resp=$input.first().json||{};\nlet bid='';try{bid=(resp.updates&&resp.updates[0]&&resp.updates[0].id)||resp.id||'';}catch(e){}\nreturn [{ json:{ chatId:m.chatId, kind:m.kind, platform:m.platform, topic:m.topic, style:m.style, caption:m.caption, media_urls:m.media_urls, visual_source:m.visual_source||'', __sched_id:(m.__sched_id||''), buffer_id:bid, link:'Queued in Buffer ('+m.platform+')' } }];"
       },
       "id": "cd-result-buffer", "name": "📋 Result: Buffer",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5220, 720]
@@ -543,7 +543,7 @@
           { "name": "Prefer", "value": "return=minimal" }
         ]},
         "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ chat_id:$json.chatId, platform:$json.platform, content_type:$json.kind, topic:$json.topic, style:$json.style, caption:$json.caption, media_urls:$json.media_urls, style_tags:$json.style }) }}",
+        "body": "={{ JSON.stringify({ chat_id:$json.chatId, platform:$json.platform, content_type:$json.kind, topic:$json.topic, style:$json.style, caption:$json.caption, media_urls:$json.media_urls, style_tags:$json.style, buffer_id:($json.buffer_id||null) }) }}",
         "options": { "response": { "response": { "neverError": true } } }
       },
       "id": "cd-memory-log", "name": "🧠 Log to Memory",
@@ -1155,6 +1155,88 @@
       },
       "id": "cd-sched-mark", "name": "🗓️ Mark Scheduled Done",
       "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [6100, 1040]
+    },
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 6 }] }
+      },
+      "id": "cd-an-trigger", "name": "📊 Analytics Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [-700, 2100]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_memory?buffer_id=not.is.null&select=*&order=created_at.desc&limit=50",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-an-fetch", "name": "📥 Fetch Recent Posts",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-480, 2100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const lr=$json; const rows=Array.isArray(lr)?lr:(lr.data||[]); return rows.map(r=>({ json:r }));" },
+      "id": "cd-an-explode", "name": "📤 Explode Posts",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-260, 2100]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.bufferapp.com/1/updates/{{ $json.buffer_id }}.json?access_token={{ $vars.BUFFER_ACCESS_TOKEN }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-an-stats", "name": "📈 Buffer: Get Stats",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-40, 2100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const meta=$('📤 Explode Posts').item.json; const resp=$json||{}; const st=(resp.statistics)||{}; const likes=+(st.favorites||st.likes||0); const comments=+(st.comments||0); const shares=+(st.shares||st.retweets||0); const saves=+(st.saves||0); const reach=+(st.reach||st.impressions||0); const clicks=+(st.clicks||0); const score=likes + comments*3 + shares*5 + saves*4 + clicks*0.5 + reach*0.01; return [{ json:{ id:meta.id, chat_id:meta.chat_id, topic:meta.topic, style:meta.style, platform:meta.platform, metrics:{likes,comments,shares,saves,reach,clicks}, score:Math.round(score*100)/100 } }];" },
+      "id": "cd-an-score", "name": "🧮 Score & Merge",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [180, 2100]
+    },
+    {
+      "parameters": {
+        "method": "PATCH", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_memory?id=eq.{{ $json.id }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "return=minimal" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ metrics:$json.metrics, score:$json.score, metrics_updated_at:$now.toISO() }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-an-update", "name": "💾 Update Metrics",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [400, 2020]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows=$input.all().map(i=>i.json); const byChat={}; rows.forEach(r=>{ (byChat[r.chat_id]=byChat[r.chat_id]||[]).push(r); }); return Object.keys(byChat).map(cid=>{ const arr=byChat[cid].sort((a,b)=>b.score-a.score).slice(0,5); const summary=arr.map(a=>a.topic+' ['+a.style+'] (score '+a.score+')').join('; '); return { json:{ chat_id:cid, winners:summary } }; });" },
+      "id": "cd-an-winners", "name": "🏆 Aggregate Winners",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [400, 2180]
+    },
+    {
+      "parameters": {
+        "method": "PATCH", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_state?chat_id=eq.{{ $json.chat_id }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "return=minimal" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ winners:$json.winners, updated_at:$now.toISO() }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-an-savewin", "name": "💾 Save Winners",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [620, 2180]
     }
   ],
 
@@ -1320,7 +1402,16 @@
     "📌 API: Pinterest Pin": { "main": [[{ "node": "📋 Result: Pinterest", "type": "main", "index": 0 }]] },
     "📋 Result: Pinterest":{ "main": [[{ "node": "🧠 Log to Memory", "type": "main", "index": 0 }]] },
     "🧠 Log to Memory":    { "main": [[{ "node": "🗓️ Mark Scheduled Done", "type": "main", "index": 0 }]] },
-    "🗓️ Mark Scheduled Done": { "main": [[{ "node": "💬 Telegram: Done", "type": "main", "index": 0 }]] }
+    "🗓️ Mark Scheduled Done": { "main": [[{ "node": "💬 Telegram: Done", "type": "main", "index": 0 }]] },
+    "📊 Analytics Trigger": { "main": [[{ "node": "📥 Fetch Recent Posts", "type": "main", "index": 0 }]] },
+    "📥 Fetch Recent Posts": { "main": [[{ "node": "📤 Explode Posts", "type": "main", "index": 0 }]] },
+    "📤 Explode Posts": { "main": [[{ "node": "📈 Buffer: Get Stats", "type": "main", "index": 0 }]] },
+    "📈 Buffer: Get Stats": { "main": [[{ "node": "🧮 Score & Merge", "type": "main", "index": 0 }]] },
+    "🧮 Score & Merge": { "main": [[
+      { "node": "💾 Update Metrics", "type": "main", "index": 0 },
+      { "node": "🏆 Aggregate Winners", "type": "main", "index": 0 }
+    ]]},
+    "🏆 Aggregate Winners": { "main": [[{ "node": "💾 Save Winners", "type": "main", "index": 0 }]] }
   },
   "active": false,
   "settings": { "executionOrder": "v1", "saveManualExecutions": true },
