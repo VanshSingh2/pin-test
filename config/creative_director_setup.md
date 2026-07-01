@@ -75,3 +75,21 @@ or simply: `make a 6-slide carousel on cold brew myths` · `post an image about 
 - **Buffer carousels**: Buffer's classic API posts a single media; the bot stores all slide URLs. For true multi-image IG carousels use the Instagram Graph API.
 - **AI video**: this Director animates AI **stills** + clips via FFmpeg. For true generative **image→video** (Veo/Kling/Wan), use `youtube_tiktok_v4_ondemand_openrouter.json` (it already selects the video model).
 - **TikTok via API** posts privately until your app is audited.
+
+
+---
+
+## ✅ QA / Approval gates (human-in-the-loop)
+
+The Director now delegates and **pauses for your approval** at each key step (Telegram send-and-wait — you tap ✅/❌). Nothing proceeds or posts without you.
+
+| Gate | When it fires | Why |
+|------|---------------|-----|
+| 📝 **Approve: Script** | After the master brief (script/scenes/caption) | Review the script before anything is generated |
+| 🎨 **Approve: AI Images** | `visual_source=ai_video`, after scene images are generated, **before** the paid image→video model | Don't spend on AI video for images you don't like |
+| 📌 **Approve: Pinterest Clips** | `visual_source=pinterest`, after clips are found | Confirm the scraped clips fit before rendering |
+| 🧑‍⚖️ **Approve: Post** | After the video/carousel/image is rendered (FFmpeg **or** HyperFrames) | Final sign-off before it publishes |
+
+Reject at any gate → it stops and tells you; the work already done is saved. Approve → it continues. The Director stays as the orchestrator/relay between you and the agents.
+
+> These use n8n's Telegram *Send and Wait for Response*, so the workflow must be **active** and reachable by webhook (self-hosted n8n handles this). Approvals resume the exact run.

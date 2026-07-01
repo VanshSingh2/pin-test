@@ -731,7 +731,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const base=$('🖼️ AIV: Extract').item.json;\nlet url='';try{url=$json.data.display_url||$json.data.url;}catch(e){}\nconst lr=$('💾 Load Brand State').first().json; const rows=Array.isArray(lr)?lr:(lr.data||[]); const vm=(rows[0]&&rows[0].video_model)||'google/veo-3.1-lite';\nconst body={ model:vm, prompt:'slow cinematic camera motion, '+(base.style||'')+', high quality realistic motion', duration:Number($vars.VIDEO_CLIP_SECONDS||4), resolution:'720p', aspect_ratio:'9:16', generate_audio:false, frame_images:[{ type:'image_url', image_url:{ url }, frame_type:'first_frame' }] };\nreturn [{ json:{ idx:base.idx, narration:base.narration, on_screen_text:base.on_screen_text, videoBody:body } }];"
+        "jsCode": "const base=$json;\nconst url=base.url||'';\nconst lr=$('💾 Load Brand State').first().json; const rows=Array.isArray(lr)?lr:(lr.data||[]); const vm=(rows[0]&&rows[0].video_model)||'google/veo-3.1-lite';\nconst body={ model:vm, prompt:'slow cinematic camera motion, '+(base.style||'')+', high quality realistic motion', duration:Number($vars.VIDEO_CLIP_SECONDS||4), resolution:'720p', aspect_ratio:'9:16', generate_audio:false, frame_images:[{ type:'image_url', image_url:{ url }, frame_type:'first_frame' }] };\nreturn [{ json:{ idx:base.idx, narration:base.narration, on_screen_text:base.on_screen_text, videoBody:body } }];"
       },
       "id": "cd-aiv-prep", "name": "🧩 AIV: Prep Video",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3180, 1500]
@@ -859,6 +859,92 @@
       "id": "cd-cancel-post", "name": "🚫 Post Cancelled",
       "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [5000, 720],
       "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const hosts=$input.all().map(i=>i.json); const meta=$('🖼️ AIV: Extract').all().map(i=>i.json); const images=hosts.map((h,i)=>{ let url=''; try{url=h.data.display_url||h.data.url;}catch(e){} return { idx:(meta[i]&&meta[i].idx)||i, url, narration:(meta[i]&&meta[i].narration)||'', on_screen_text:(meta[i]&&meta[i].on_screen_text)||'' }; }); const chatId=$('📋 Parse Brief').first().json.chatId; return [{ json:{ images, chatId, urls:images.map(x=>x.url).join('\\n') } }];"
+      },
+      "id": "cd-aiv-imgather", "name": "🖼️ Gather AI Images",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3180, 1680]
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "={{ $json.chatId }}",
+        "message": "=🎨 AI scene images ready — approve before I generate the (paid) AI video?\n\n{{ $json.urls }}",
+        "responseType": "approval",
+        "approvalOptions": { "values": { "approvalType": "double", "approveLabel": "✅ Make the video", "disapproveLabel": "❌ Reject" } },
+        "options": {}
+      },
+      "id": "cd-gate-aiimg", "name": "🎨 Approve: AI Images",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [3400, 1680],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "ia", "leftValue": "={{ $json.data.approved }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equal" } }], "combinator": "and" }
+      },
+      "id": "cd-if-aiimg", "name": "❓ AI Images Approved?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [3620, 1680]
+    },
+    {
+      "parameters": { "jsCode": "const imgs=$('🖼️ Gather AI Images').first().json.images||[]; return imgs.map(im=>({ json:im }));" },
+      "id": "cd-aiv-imexplode", "name": "📤 Explode AI Images",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3840, 1680]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('🖼️ Gather AI Images').first().json.chatId }}",
+        "text": "🚫 Rejected the AI images — video generation skipped (no video-model spend).",
+        "additionalFields": {}
+      },
+      "id": "cd-cancel-aiimg", "name": "🚫 AI Images Cancelled",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [3840, 1860],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items=$input.all().map(i=>i.json); const chatId=$('📋 Parse Brief').first().json.chatId; return [{ json:{ scenes:items, chatId, urls:items.map(x=>x.clip_url).filter(Boolean).join('\\n')||'(no clips found)' } }];"
+      },
+      "id": "cd-pin-gather", "name": "📌 Gather Pinterest Clips",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3020, 1360]
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "={{ $json.chatId }}",
+        "message": "=📌 Found these Pinterest clips — use them?\n\n{{ $json.urls }}",
+        "responseType": "approval",
+        "approvalOptions": { "values": { "approvalType": "double", "approveLabel": "✅ Use clips", "disapproveLabel": "❌ Reject" } },
+        "options": {}
+      },
+      "id": "cd-gate-pinclip", "name": "📌 Approve: Pinterest Clips",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [3240, 1360],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "ip", "leftValue": "={{ $json.data.approved }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equal" } }], "combinator": "and" }
+      },
+      "id": "cd-if-pinclip", "name": "❓ Clips Approved?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [3460, 1360]
+    },
+    {
+      "parameters": { "jsCode": "const sc=$('📌 Gather Pinterest Clips').first().json.scenes||[]; return sc.map(s=>({ json:s }));" },
+      "id": "cd-pin-explode", "name": "📤 Explode Clips",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3680, 1360]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('📌 Gather Pinterest Clips').first().json.chatId }}",
+        "text": "🚫 Rejected the Pinterest clips. Try a different reference style or switch visual_source.",
+        "additionalFields": {}
+      },
+      "id": "cd-cancel-pinclip", "name": "🚫 Clips Cancelled",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [3680, 1540],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
     }
   ],
 
@@ -925,7 +1011,14 @@
     ]},
     "🎥 AIV: Scene Image":  { "main": [[{ "node": "🖼️ AIV: Extract", "type": "main", "index": 0 }]] },
     "🖼️ AIV: Extract":     { "main": [[{ "node": "☁️ AIV: Host Image", "type": "main", "index": 0 }]] },
-    "☁️ AIV: Host Image":  { "main": [[{ "node": "🧩 AIV: Prep Video", "type": "main", "index": 0 }]] },
+    "☁️ AIV: Host Image":  { "main": [[{ "node": "🖼️ Gather AI Images", "type": "main", "index": 0 }]] },
+    "🖼️ Gather AI Images": { "main": [[{ "node": "🎨 Approve: AI Images", "type": "main", "index": 0 }]] },
+    "🎨 Approve: AI Images": { "main": [[{ "node": "❓ AI Images Approved?", "type": "main", "index": 0 }]] },
+    "❓ AI Images Approved?": { "main": [
+      [{ "node": "📤 Explode AI Images", "type": "main", "index": 0 }],
+      [{ "node": "🚫 AI Images Cancelled", "type": "main", "index": 0 }]
+    ]},
+    "📤 Explode AI Images": { "main": [[{ "node": "🧩 AIV: Prep Video", "type": "main", "index": 0 }]] },
     "🧩 AIV: Prep Video":  { "main": [[{ "node": "🎬 AIV: Image→Video Submit", "type": "main", "index": 0 }]] },
     "🎬 AIV: Image→Video Submit": { "main": [[{ "node": "📦 AIV: Collect Jobs", "type": "main", "index": 0 }]] },
     "📦 AIV: Collect Jobs": { "main": [[{ "node": "⏳ AIV: Wait (render)", "type": "main", "index": 0 }]] },
@@ -940,7 +1033,14 @@
     "📷 Scene: Pexels Clip":{ "main": [[{ "node": "📋 Scene: Pexels Ready", "type": "main", "index": 0 }]] },
     "📋 Scene: Pexels Ready": { "main": [[{ "node": "🎞️ Video: Build FFmpeg", "type": "main", "index": 0 }]] },
     "📌 Scene: Pinterest Clip": { "main": [[{ "node": "📋 Scene: Pinterest Ready", "type": "main", "index": 0 }]] },
-    "📋 Scene: Pinterest Ready": { "main": [[{ "node": "🎞️ Video: Build FFmpeg", "type": "main", "index": 0 }]] },
+    "📋 Scene: Pinterest Ready": { "main": [[{ "node": "📌 Gather Pinterest Clips", "type": "main", "index": 0 }]] },
+    "📌 Gather Pinterest Clips": { "main": [[{ "node": "📌 Approve: Pinterest Clips", "type": "main", "index": 0 }]] },
+    "📌 Approve: Pinterest Clips": { "main": [[{ "node": "❓ Clips Approved?", "type": "main", "index": 0 }]] },
+    "❓ Clips Approved?": { "main": [
+      [{ "node": "📤 Explode Clips", "type": "main", "index": 0 }],
+      [{ "node": "🚫 Clips Cancelled", "type": "main", "index": 0 }]
+    ]},
+    "📤 Explode Clips": { "main": [[{ "node": "🎞️ Video: Build FFmpeg", "type": "main", "index": 0 }]] },
     "🎞️ Video: Build FFmpeg": { "main": [[{ "node": "🔀 Render Engine", "type": "main", "index": 0 }]] },
     "🔀 Render Engine": { "main": [
       [{ "node": "🎬 HF: Build Composition", "type": "main", "index": 0 }],
