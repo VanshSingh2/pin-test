@@ -5,7 +5,8 @@ This is an honest review of where the project is strong, what was just improved,
 ---
 
 ## ✅ Just shipped (quality upgrades)
-- **Brief is now specialist-grade**: the Master Brief prompt now demands a scroll-stopping hook (1–2s), platform-native captions (hook → value → CTA), an 8–15 hashtag strategy (broad + niche mix), and freshness.
+- **Brief is now specialist-grade** and acts as five specialists in one pass: **Trend Strategist, Script Writer, Script Doctor (self-review), Art Director, Music Supervisor**.
+- **Brand overlay + background music** (FFmpeg engine): set `BRAND_LOGO_URL` (watermark, top-right) and `BRAND_MUSIC_URL` (ducked under the voiceover) as n8n variables — optional, skipped if unset.
 - **Brand + style are locked**: they no longer drift between posts — only change when you explicitly change the style. Always confirms before creating.
 - **Conversation memory = last 20 turns** (stored in `cd_state.history`).
 - **"Show settings" + idea suggestions**: ask the bot what's set, or for ideas, anytime.
