@@ -30,7 +30,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const intake=$('🧠 Intake').first().json;\nconst rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nconst s=rows[0]||{};\nconst d={ niche:s.niche||'', style:s.style||'', platform:s.platform||'instagram', content_type:s.content_type||'video', visual_source:s.visual_source||'ai', image_model:s.image_model||'openai/gpt-image-1', video_model:s.video_model||'google/veo-3.1-lite', posting_method:s.posting_method||'buffer', render_engine:s.render_engine||'ffmpeg', reference:s.reference||'', brand_bible:s.brand_bible||'', pending:s.pending_action||null, history:(s.history||[]) }; const convo=(d.history||[]).slice(-20).map(h=>'U: '+h.u+' / A: '+h.a).join(' || ');\nconst sys=`You are a world-class Creative Director running a multi-platform content studio for one creator. You chat naturally, remember the recent conversation, keep everything ON-BRAND using the brand memory, and ALWAYS CONFIRM before creating. Supported platforms: instagram, youtube, tiktok, pinterest, facebook, both. Video render engines: ffmpeg (fast; clips/stills + captions) or hyperframes (HTML motion graphics, higher quality) — to change it return set_render_engine with value ffmpeg or hyperframes. Recent conversation: ${convo||'(first message)'}.\\n\\nCurrent settings:\\n- niche: \\\"${d.niche||'(not set)'}\\\"\\n- style: \\\"${d.style||'(not set)'}\\\"\\n- platform: ${d.platform}\\n- content_type: ${d.content_type}\\n- visual_source: ${d.visual_source} (ai = AI-generated visuals; pexels/pinterest = real stock clips or images)\\n- image_model: ${d.image_model}\\n- video_model: ${d.video_model}\\n- posting_method: ${d.posting_method} (buffer or api)\\n- reference (clip search phrase): \\\"${d.reference||'(none)'}\\\"\\n- BRAND BIBLE (keep new work consistent with this): \\\"${d.brand_bible||'(empty — first creation)'}\\\"\\n- pending action: ${d.pending?JSON.stringify(d.pending):'(none)'}\\n\\nYou understand free-form requests. The user can set any of: niche, style, platform, content_type (image|carousel|video), visual_source (ai|pexels|pinterest), image_model, video_model, posting_method (buffer|api), reference. They can also paste a SCRIPT to use, or ask you to decide as the specialist.\\n\\nRules:\\n- If they change any setting => intent=set_config and fill the matching set_* fields (only the ones mentioned).\\n- If they ask to CREATE => intent=propose. Fill action {content_type, platform, topic, script, slide_count, visual_source, posting_method}. Use current settings as defaults; if they didn't specify posting method, you MAY ask in the reply (e.g. 'post via Buffer or API?'). Write a short plan and ask them to reply 'yes'.\\n- Confirm (yes/go/make it) with a pending action => intent=confirm.\\n- cancel => intent=cancel. If they ask to see/show settings, reply (intent=chat) listing current niche, style, platform, visual_source, image_model and posting_method. If they're unsure what to make, suggest 2-3 on-brand ideas that fit the niche+style. Else intent=chat.\\n- If niche or style is missing when creating, ask them to set it first (intent=chat).\\nRespond STRICT JSON only.`;\nconst usr=`User: \\\"${intake.text}\\\"\\nReturn JSON: {\\n \\\"reply\\\":\\\"natural reply\\\",\\n \\\"intent\\\":\\\"set_config|propose|confirm|cancel|chat\\\",\\n \\\"set_niche\\\":\\\"\\\",\\\"set_style\\\":\\\"\\\",\\\"set_platform\\\":\\\"\\\",\\\"set_content_type\\\":\\\"\\\",\\\"set_visual_source\\\":\\\"\\\",\\\"set_image_model\\\":\\\"\\\",\\\"set_video_model\\\":\\\"\\\",\\\"set_posting_method\\\":\\\"\\\",\\\"set_reference\\\":\\\"\\\",\\n \\\"content_type\\\":\\\"\\\",\\\"platform\\\":\\\"\\\",\\\"topic\\\":\\\"\\\",\\\"script\\\":\\\"\\\",\\\"slide_count\\\":5,\\\"visual_source\\\":\\\"\\\",\\\"posting_method\\\":\\\"\\\"\\n}`;\nreturn [{ json:{ chatId:intake.chatId, d, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:900 } } }];"
+        "jsCode": "const intake=$('🧠 Intake').first().json;\nconst rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nconst s=rows[0]||{};\nconst d={ niche:s.niche||'', style:s.style||'', platform:s.platform||'instagram', content_type:s.content_type||'video', visual_source:s.visual_source||'ai', image_model:s.image_model||'openai/gpt-image-1', video_model:s.video_model||'google/veo-3.1-lite', posting_method:s.posting_method||'buffer', render_engine:s.render_engine||'ffmpeg', reference:s.reference||'', brand_bible:s.brand_bible||'', pending:s.pending_action||null, history:(s.history||[]) }; const convo=(d.history||[]).slice(-20).map(h=>'U: '+h.u+' / A: '+h.a).join(' || ');\nconst sys=`You are a world-class Creative Director running a multi-platform content studio for one creator. You chat naturally, remember the recent conversation, keep everything ON-BRAND using the brand memory, and ALWAYS CONFIRM before creating. Supported platforms: instagram, youtube, tiktok, pinterest, facebook, both. Video render engines: ffmpeg (fast; clips/stills + captions) or hyperframes (HTML motion graphics, higher quality) — to change it return set_render_engine with value ffmpeg or hyperframes. Recent conversation: ${convo||'(first message)'}.\\n\\nCurrent settings:\\n- niche: \\\"${d.niche||'(not set)'}\\\"\\n- style: \\\"${d.style||'(not set)'}\\\"\\n- platform: ${d.platform}\\n- content_type: ${d.content_type}\\n- visual_source: ${d.visual_source} (ai = AI-generated visuals; pexels/pinterest = real stock clips or images; ai_video = AI-generated motion clips via image-to-video model)\\n- image_model: ${d.image_model}\\n- video_model: ${d.video_model}\\n- posting_method: ${d.posting_method} (buffer or api)\\n- reference (clip search phrase): \\\"${d.reference||'(none)'}\\\"\\n- BRAND BIBLE (keep new work consistent with this): \\\"${d.brand_bible||'(empty — first creation)'}\\\"\\n- pending action: ${d.pending?JSON.stringify(d.pending):'(none)'}\\n\\nYou understand free-form requests. The user can set any of: niche, style, platform, content_type (image|carousel|video), visual_source (ai|pexels|pinterest), image_model, video_model, posting_method (buffer|api), reference. They can also paste a SCRIPT to use, or ask you to decide as the specialist.\\n\\nRules:\\n- If they change any setting => intent=set_config and fill the matching set_* fields (only the ones mentioned).\\n- If they ask to CREATE => intent=propose. Fill action {content_type, platform, topic, script, slide_count, visual_source, posting_method}. Use current settings as defaults; if they didn't specify posting method, you MAY ask in the reply (e.g. 'post via Buffer or API?'). Write a short plan and ask them to reply 'yes'.\\n- Confirm (yes/go/make it) with a pending action => intent=confirm.\\n- cancel => intent=cancel. If they ask to see/show settings, reply (intent=chat) listing current niche, style, platform, visual_source, image_model and posting_method. If they're unsure what to make, suggest 2-3 on-brand ideas that fit the niche+style. Else intent=chat.\\n- If niche or style is missing when creating, ask them to set it first (intent=chat).\\nRespond STRICT JSON only.`;\nconst usr=`User: \\\"${intake.text}\\\"\\nReturn JSON: {\\n \\\"reply\\\":\\\"natural reply\\\",\\n \\\"intent\\\":\\\"set_config|propose|confirm|cancel|chat\\\",\\n \\\"set_niche\\\":\\\"\\\",\\\"set_style\\\":\\\"\\\",\\\"set_platform\\\":\\\"\\\",\\\"set_content_type\\\":\\\"\\\",\\\"set_visual_source\\\":\\\"\\\",\\\"set_image_model\\\":\\\"\\\",\\\"set_video_model\\\":\\\"\\\",\\\"set_posting_method\\\":\\\"\\\",\\\"set_reference\\\":\\\"\\\",\\n \\\"content_type\\\":\\\"\\\",\\\"platform\\\":\\\"\\\",\\\"topic\\\":\\\"\\\",\\\"script\\\":\\\"\\\",\\\"slide_count\\\":5,\\\"visual_source\\\":\\\"\\\",\\\"posting_method\\\":\\\"\\\"\\n}`;\nreturn [{ json:{ chatId:intake.chatId, d, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:900 } } }];"
       },
       "id": "cd-brain-build", "name": "🧠 Director Brain Prompt",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-40, 500]
@@ -307,7 +307,8 @@
         "rules": { "values": [
           { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "ai", "leftValue": "={{ $json.visual_source }}", "rightValue": "ai", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "ai" },
           { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "px", "leftValue": "={{ $json.visual_source }}", "rightValue": "pexels", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "pexels" },
-          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "pn", "leftValue": "={{ $json.visual_source }}", "rightValue": "pinterest", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "pinterest" }
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "pn", "leftValue": "={{ $json.visual_source }}", "rightValue": "pinterest", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "pinterest" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "aiv", "leftValue": "={{ $json.visual_source }}", "rightValue": "ai_video", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "ai_video" }
         ]}, "options": { "fallbackOutput": "extra" }
       },
       "id": "cd-vsrc-switch", "name": "🔀 Visual Source",
@@ -692,6 +693,98 @@
       },
       "id": "cd-hf-package", "name": "📦 HF: Package",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [4720, 1360]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: ($json.image_model||'openai/gpt-image-1'), modalities:['image','text'], messages:[{ role:'user', content: ('Vertical 9:16 still, no text in the image. '+$json.image_prompt+$json.style_suffix) }] }) }}",
+        "options": { "timeout": 120000, "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-aiv-img", "name": "🎥 AIV: Scene Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2520, 1500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base=$('🎬 Video: Split Scenes').item.json;\nconst resp=$json;let x='';\ntry{ const msg=resp.choices&&resp.choices[0]&&resp.choices[0].message; if(msg&&msg.images&&msg.images[0]){ const u=msg.images[0].image_url?msg.images[0].image_url.url:msg.images[0].url; x=(u||'').split(',').pop(); } else if(resp.data&&resp.data[0]&&resp.data[0].b64_json){ x=resp.data[0].b64_json; } }catch(e){}\nreturn [{ json:{ ...base, img_b64:x } }];"
+      },
+      "id": "cd-aiv-extract", "name": "🖼️ AIV: Extract",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [2740, 1500]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.imgbb.com/1/upload",
+        "sendBody": true, "contentType": "form-urlencoded",
+        "bodyParameters": { "parameters": [
+          { "name": "key", "value": "={{ $vars.IMGBB_API_KEY }}" },
+          { "name": "image", "value": "={{ $json.img_b64 }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-aiv-host", "name": "☁️ AIV: Host Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [2960, 1500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base=$('🖼️ AIV: Extract').item.json;\nlet url='';try{url=$json.data.display_url||$json.data.url;}catch(e){}\nconst lr=$('💾 Load Brand State').first().json; const rows=Array.isArray(lr)?lr:(lr.data||[]); const vm=(rows[0]&&rows[0].video_model)||'google/veo-3.1-lite';\nconst body={ model:vm, prompt:'slow cinematic camera motion, '+(base.style||'')+', high quality realistic motion', duration:Number($vars.VIDEO_CLIP_SECONDS||4), resolution:'720p', aspect_ratio:'9:16', generate_audio:false, frame_images:[{ type:'image_url', image_url:{ url }, frame_type:'first_frame' }] };\nreturn [{ json:{ idx:base.idx, narration:base.narration, on_screen_text:base.on_screen_text, videoBody:body } }];"
+      },
+      "id": "cd-aiv-prep", "name": "🧩 AIV: Prep Video",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3180, 1500]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/videos",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.videoBody) }}",
+        "options": { "timeout": 60000, "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-aiv-submit", "name": "🎬 AIV: Image→Video Submit",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [3400, 1500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const preps=$('🧩 AIV: Prep Video').all().map(i=>i.json);\nconst resps=$input.all().map(i=>i.json);\nconst jobs=resps.map((r,i)=>({ idx:(preps[i]&&preps[i].idx)||i, jobId:r.id||'', polling_url:(r.polling_url||('/api/v1/videos/'+(r.id||''))), narration:(preps[i]&&preps[i].narration)||'', on_screen_text:(preps[i]&&preps[i].on_screen_text)||'' }));\nreturn [{ json:{ jobs } }];"
+      },
+      "id": "cd-aiv-collect", "name": "📦 AIV: Collect Jobs",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3620, 1500]
+    },
+    {
+      "parameters": { "amount": 120, "unit": "seconds" },
+      "id": "cd-aiv-wait", "name": "⏳ AIV: Wait (render)",
+      "type": "n8n-nodes-base.wait", "typeVersion": 1.1, "position": [3840, 1500]
+    },
+    {
+      "parameters": { "jsCode": "const jobs=$json.jobs||[];\nreturn jobs.map(j=>({ json:j }));" },
+      "id": "cd-aiv-explode", "name": "📤 AIV: Explode",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [4060, 1500]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://openrouter.ai{{ $json.polling_url.startsWith('http') ? $json.polling_url.replace('https://openrouter.ai','') : $json.polling_url }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" }] },
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-aiv-poll", "name": "🔁 AIV: Poll",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [4280, 1500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const meta=$('📤 AIV: Explode').all().map(i=>i.json);\nconst polls=$input.all().map(i=>i.json);\nreturn meta.map((j,i)=>{ const p=polls[i]||{}; let url=''; if(p&&p.status==='completed'){ url=(p.unsigned_urls&&p.unsigned_urls[0])||('https://openrouter.ai/api/v1/videos/'+j.jobId+'/content?index=0'); } return { json:{ idx:j.idx, narration:j.narration, on_screen_text:j.on_screen_text, image_url:'', clip_url:url } }; });"
+      },
+      "id": "cd-aiv-merge", "name": "📋 AIV: Scenes Ready",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [4500, 1500]
     }
   ],
 
@@ -748,8 +841,19 @@
       [{ "node": "🎨 Scene: AI Image", "type": "main", "index": 0 }],
       [{ "node": "📷 Scene: Pexels Clip", "type": "main", "index": 0 }],
       [{ "node": "📌 Scene: Pinterest Clip", "type": "main", "index": 0 }],
+      [{ "node": "🎥 AIV: Scene Image", "type": "main", "index": 0 }],
       [{ "node": "📷 Scene: Pexels Clip", "type": "main", "index": 0 }]
     ]},
+    "🎥 AIV: Scene Image":  { "main": [[{ "node": "🖼️ AIV: Extract", "type": "main", "index": 0 }]] },
+    "🖼️ AIV: Extract":     { "main": [[{ "node": "☁️ AIV: Host Image", "type": "main", "index": 0 }]] },
+    "☁️ AIV: Host Image":  { "main": [[{ "node": "🧩 AIV: Prep Video", "type": "main", "index": 0 }]] },
+    "🧩 AIV: Prep Video":  { "main": [[{ "node": "🎬 AIV: Image→Video Submit", "type": "main", "index": 0 }]] },
+    "🎬 AIV: Image→Video Submit": { "main": [[{ "node": "📦 AIV: Collect Jobs", "type": "main", "index": 0 }]] },
+    "📦 AIV: Collect Jobs": { "main": [[{ "node": "⏳ AIV: Wait (render)", "type": "main", "index": 0 }]] },
+    "⏳ AIV: Wait (render)": { "main": [[{ "node": "📤 AIV: Explode", "type": "main", "index": 0 }]] },
+    "📤 AIV: Explode":      { "main": [[{ "node": "🔁 AIV: Poll", "type": "main", "index": 0 }]] },
+    "🔁 AIV: Poll":        { "main": [[{ "node": "📋 AIV: Scenes Ready", "type": "main", "index": 0 }]] },
+    "📋 AIV: Scenes Ready": { "main": [[{ "node": "🎞️ Video: Build FFmpeg", "type": "main", "index": 0 }]] },
     "🎨 Scene: AI Image":   { "main": [[{ "node": "🖼️ Scene: Extract AI", "type": "main", "index": 0 }]] },
     "🖼️ Scene: Extract AI": { "main": [[{ "node": "☁️ Scene: Host AI", "type": "main", "index": 0 }]] },
     "☁️ Scene: Host AI":    { "main": [[{ "node": "📋 Scene: AI Ready", "type": "main", "index": 0 }]] },
