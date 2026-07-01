@@ -891,19 +891,72 @@
       "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [3620, 1680]
     },
     {
-      "parameters": { "jsCode": "const imgs=$('🖼️ Gather AI Images').first().json.images||[]; return imgs.map(im=>({ json:im }));" },
+      "parameters": { "jsCode": "const imgs=$('🖼️ Images Ready').first().json.images||[]; return imgs.map(im=>({ json:im }));" },
       "id": "cd-aiv-imexplode", "name": "📤 Explode AI Images",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3840, 1680]
     },
     {
+      "parameters": { "jsCode": "return [{ json: $json }];" },
+      "id": "cd-aiv-imgready", "name": "🖼️ Images Ready",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3300, 2040]
+    },
+    {
       "parameters": {
-        "chatId": "={{ $('🖼️ Gather AI Images').first().json.chatId }}",
-        "text": "🚫 Rejected the AI images — video generation skipped (no video-model spend).",
-        "additionalFields": {}
+        "operation": "sendAndWait",
+        "chatId": "={{ $json.chatId }}",
+        "message": "=✏️ Which image(s) should I change, and how? Reply e.g. 'scene 2: brighter', 'redo 1 and 3', or 'all: more cinematic'. (Only the scenes you name are regenerated — the rest stay the same.)",
+        "responseType": "freeText",
+        "options": {}
       },
-      "id": "cd-cancel-aiimg", "name": "🚫 AI Images Cancelled",
-      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [3840, 1860],
+      "id": "cd-revise-aiimg", "name": "✏️ Revise: AI Images",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [3620, 2040],
       "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cur=((($('🖼️ Images Ready').first()||{}).json)||{}).images||[]; const fb=($json.data&&$json.data.text)||''; const scenes=$('🎬 Video: Split Scenes').all().map(i=>i.json); const nums=(fb.match(/\\d+/g)||[]).map(n=>parseInt(n,10)-1); const changeSet=new Set(nums.length?nums:cur.map(c=>c.idx)); const keep=cur.filter(c=>!changeSet.has(c.idx)); const regenScenes=cur.filter(c=>changeSet.has(c.idx)); const out=regenScenes.map(c=>{ const sc=scenes.find(s=>s.idx===c.idx)||{}; return { idx:c.idx, narration:c.narration, on_screen_text:c.on_screen_text, image_model:sc.image_model, image_prompt:(sc.image_prompt||'')+' -- REVISION: '+fb, style_suffix:sc.style_suffix||'', keep }; }); return out.length?out.map(o=>({json:o})):[{json:{idx:-1,image_model:(scenes[0]&&scenes[0].image_model)||'openai/gpt-image-1',image_prompt:'placeholder',style_suffix:'',keep:cur,narration:'',on_screen_text:''}}];" },
+      "id": "cd-rev-plan", "name": "🧩 Plan Image Revision",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [3900, 2040]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: ($json.image_model||'openai/gpt-image-1'), modalities:['image','text'], messages:[{ role:'user', content: ('Vertical 9:16 still, no text in the image. '+$json.image_prompt+$json.style_suffix) }] }) }}",
+        "options": { "timeout": 120000, "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-rev-img", "name": "🎨 Rev: Scene Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [4180, 2040]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base=$('🧩 Plan Image Revision').item.json; const resp=$json; let x=''; try{ const msg=resp.choices&&resp.choices[0]&&resp.choices[0].message; if(msg&&msg.images&&msg.images[0]){ const u=msg.images[0].image_url?msg.images[0].image_url.url:msg.images[0].url; x=(u||'').split(',').pop(); } else if(resp.data&&resp.data[0]&&resp.data[0].b64_json){ x=resp.data[0].b64_json; } }catch(e){} return [{ json:{ ...base, img_b64:x } }];" },
+      "id": "cd-rev-extract", "name": "🖼️ Rev: Extract",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [4460, 2040]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.imgbb.com/1/upload",
+        "sendBody": true, "contentType": "form-urlencoded",
+        "bodyParameters": { "parameters": [
+          { "name": "key", "value": "={{ $vars.IMGBB_API_KEY }}" },
+          { "name": "image", "value": "={{ $json.img_b64 }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-rev-host", "name": "☁️ Rev: Host Image",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [4740, 2040]
+    },
+    {
+      "parameters": {
+        "jsCode": "const hosts=$input.all().map(i=>i.json); const meta=$('🧩 Plan Image Revision').all().map(i=>i.json); const regen=hosts.map((h,i)=>{ let url=''; try{url=h.data.display_url||h.data.url;}catch(e){} const m=meta[i]||{}; return { idx:m.idx, url, narration:m.narration||'', on_screen_text:m.on_screen_text||'' }; }); const keep=(meta[0]&&meta[0].keep)||[]; const byIdx={}; keep.forEach(k=>{byIdx[k.idx]=k;}); regen.forEach(r=>{ if(r.idx!=null&&r.idx>=0){byIdx[r.idx]=r;} }); const images=Object.keys(byIdx).map(k=>byIdx[k]).sort((a,b)=>(a.idx||0)-(b.idx||0)); const chatId=$('📋 Parse Brief').first().json.chatId; return [{ json:{ images, chatId, urls:images.map(x=>x.url).join(String.fromCharCode(10)) } }];" },
+      "id": "cd-rev-merge", "name": "🔀 Rev: Merge Images",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5020, 2040]
     },
     {
       "parameters": {
@@ -1023,12 +1076,19 @@
     "🎥 AIV: Scene Image":  { "main": [[{ "node": "🖼️ AIV: Extract", "type": "main", "index": 0 }]] },
     "🖼️ AIV: Extract":     { "main": [[{ "node": "☁️ AIV: Host Image", "type": "main", "index": 0 }]] },
     "☁️ AIV: Host Image":  { "main": [[{ "node": "🖼️ Gather AI Images", "type": "main", "index": 0 }]] },
-    "🖼️ Gather AI Images": { "main": [[{ "node": "🎨 Approve: AI Images", "type": "main", "index": 0 }]] },
+    "🖼️ Gather AI Images": { "main": [[{ "node": "🖼️ Images Ready", "type": "main", "index": 0 }]] },
+    "🖼️ Images Ready": { "main": [[{ "node": "🎨 Approve: AI Images", "type": "main", "index": 0 }]] },
     "🎨 Approve: AI Images": { "main": [[{ "node": "❓ AI Images Approved?", "type": "main", "index": 0 }]] },
     "❓ AI Images Approved?": { "main": [
       [{ "node": "📤 Explode AI Images", "type": "main", "index": 0 }],
-      [{ "node": "🚫 AI Images Cancelled", "type": "main", "index": 0 }]
+      [{ "node": "✏️ Revise: AI Images", "type": "main", "index": 0 }]
     ]},
+    "✏️ Revise: AI Images": { "main": [[{ "node": "🧩 Plan Image Revision", "type": "main", "index": 0 }]] },
+    "🧩 Plan Image Revision": { "main": [[{ "node": "🎨 Rev: Scene Image", "type": "main", "index": 0 }]] },
+    "🎨 Rev: Scene Image": { "main": [[{ "node": "🖼️ Rev: Extract", "type": "main", "index": 0 }]] },
+    "🖼️ Rev: Extract": { "main": [[{ "node": "☁️ Rev: Host Image", "type": "main", "index": 0 }]] },
+    "☁️ Rev: Host Image": { "main": [[{ "node": "🔀 Rev: Merge Images", "type": "main", "index": 0 }]] },
+    "🔀 Rev: Merge Images": { "main": [[{ "node": "🖼️ Images Ready", "type": "main", "index": 0 }]] },
     "📤 Explode AI Images": { "main": [[{ "node": "🧩 AIV: Prep Video", "type": "main", "index": 0 }]] },
     "🧩 AIV: Prep Video":  { "main": [[{ "node": "🎬 AIV: Image→Video Submit", "type": "main", "index": 0 }]] },
     "🎬 AIV: Image→Video Submit": { "main": [[{ "node": "📦 AIV: Collect Jobs", "type": "main", "index": 0 }]] },
