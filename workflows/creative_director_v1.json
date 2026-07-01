@@ -847,20 +847,82 @@
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: $('📦 Package Normalize').first().json }];"
+        "jsCode": "return [{ json: $('📦 Post Ready').first().json }];"
       },
       "id": "cd-post-restore", "name": "♻️ Restore Post Data",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5000, 540]
     },
     {
+      "parameters": { "jsCode": "return [{ json: $json }];" },
+      "id": "cd-post-ready", "name": "📦 Post Ready",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [4340, 500]
+    },
+    {
       "parameters": {
-        "chatId": "={{ $('📦 Package Normalize').first().json.chatId }}",
-        "text": "🚫 Post cancelled. The media is saved — ask me to re-post anytime.",
-        "additionalFields": {}
+        "operation": "sendAndWait",
+        "chatId": "={{ $json.chatId }}",
+        "message": "=✏️ What should I change before posting? Reply e.g. 'caption: shorter + stronger CTA', 'change the title', 'make a new video', 'redo the subtitles/on-screen text', or 'rewrite the script'.",
+        "responseType": "freeText",
+        "options": {}
       },
-      "id": "cd-cancel-post", "name": "🚫 Post Cancelled",
+      "id": "cd-revise-post", "name": "✏️ Revise: Post",
       "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [5000, 720],
       "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const p=$('📦 Post Ready').first().json; const fb=($json.data&&$json.data.text)||''; const nl=String.fromCharCode(10); const sys='You are the post editor for a social media creator. The user rejected a finished post and requested a change. Respond as strict JSON with keys: action, new_caption, new_title. action must be one of: caption (only wording/caption/title/hashtags change, no re-render), remedia (they want a new or different video or images or subtitles but the SAME topic and script), rescript (the script, story, hook or narration should change). When action is caption, rewrite new_caption keeping a strong hook, CTA and relevant hashtags in the brand voice, and set new_title if the title should change; otherwise leave new_caption and new_title empty.'; const usr='Current title: '+(p.title||'')+nl+'Current caption: '+(p.caption||'')+nl+'Content type: '+(p.kind||'')+nl+'Platform: '+(p.platform||'')+nl+'User request: '+fb; return [{ json:{ ...p, revision_feedback:fb, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:800 } } }];" },
+      "id": "cd-postrev-prompt", "name": "🧠 Post Revision Prompt",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5000, 900]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $vars.OPENROUTER_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.requestBody) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-postrev-ai", "name": "🤖 OpenRouter: Post Revision",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [5220, 900]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p=$('📦 Post Ready').first().json; let o={}; try{ o=JSON.parse($input.first().json.choices[0].message.content); }catch(e){ const mm=((($input.first().json.choices||[{}])[0].message||{}).content||'').match(/\\{[\\s\\S]*\\}/); if(mm)o=JSON.parse(mm[0]); } const action=(o.action||'remedia').toLowerCase(); const caption=o.new_caption?o.new_caption:p.caption; const title=o.new_title?o.new_title:p.title; return [{ json:{ ...p, action, caption, title, revision_feedback:$('🧠 Post Revision Prompt').first().json.revision_feedback } }];" },
+      "id": "cd-postrev-parse", "name": "📋 Parse Post Revision",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5440, 900]
+    },
+    {
+      "parameters": {
+        "rules": { "values": [
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "cap", "leftValue": "={{ $json.action }}", "rightValue": "caption", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "caption" },
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "rsc", "leftValue": "={{ $json.action }}", "rightValue": "rescript", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "rescript" }
+        ]}, "options": { "fallbackOutput": "extra" }
+      },
+      "id": "cd-postrev-route", "name": "🔀 Post Revision Route",
+      "type": "n8n-nodes-base.switch", "typeVersion": 3, "position": [5660, 900]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ...$('📦 Post Ready').first().json, caption:$json.caption, title:$json.title } }];" },
+      "id": "cd-postrev-repackage", "name": "♻️ Repackage Post",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5880, 720]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('📋 Parse Brief').first().json }];" },
+      "id": "cd-postrev-remedia", "name": "🎬 Media Regen Entry",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5880, 900]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ...$('📋 Parse Director').first().json, revision_feedback: $json.revision_feedback||'' } }];" },
+      "id": "cd-postrev-rescript", "name": "✏️ Post→Script Revision",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5880, 1080]
     },
     {
       "parameters": {
@@ -1126,12 +1188,25 @@
     "📂 Video: Read MP4":  { "main": [[{ "node": "☁️ Video: Upload Storage", "type": "main", "index": 0 }]] },
     "☁️ Video: Upload Storage": { "main": [[{ "node": "📦 Video: Package", "type": "main", "index": 0 }]] },
     "📦 Video: Package":   { "main": [[{ "node": "📦 Package Normalize", "type": "main", "index": 0 }]] },
-    "📦 Package Normalize": { "main": [[{ "node": "🧑‍⚖️ Approve: Post", "type": "main", "index": 0 }]] },
+    "📦 Package Normalize": { "main": [[{ "node": "📦 Post Ready", "type": "main", "index": 0 }]] },
+    "📦 Post Ready": { "main": [[{ "node": "🧑‍⚖️ Approve: Post", "type": "main", "index": 0 }]] },
     "🧑‍⚖️ Approve: Post": { "main": [[{ "node": "❓ Post Approved?", "type": "main", "index": 0 }]] },
     "❓ Post Approved?": { "main": [
       [{ "node": "♻️ Restore Post Data", "type": "main", "index": 0 }],
-      [{ "node": "🚫 Post Cancelled", "type": "main", "index": 0 }]
+      [{ "node": "✏️ Revise: Post", "type": "main", "index": 0 }]
     ]},
+    "✏️ Revise: Post": { "main": [[{ "node": "🧠 Post Revision Prompt", "type": "main", "index": 0 }]] },
+    "🧠 Post Revision Prompt": { "main": [[{ "node": "🤖 OpenRouter: Post Revision", "type": "main", "index": 0 }]] },
+    "🤖 OpenRouter: Post Revision": { "main": [[{ "node": "📋 Parse Post Revision", "type": "main", "index": 0 }]] },
+    "📋 Parse Post Revision": { "main": [[{ "node": "🔀 Post Revision Route", "type": "main", "index": 0 }]] },
+    "🔀 Post Revision Route": { "main": [
+      [{ "node": "♻️ Repackage Post", "type": "main", "index": 0 }],
+      [{ "node": "✏️ Post→Script Revision", "type": "main", "index": 0 }],
+      [{ "node": "🎬 Media Regen Entry", "type": "main", "index": 0 }]
+    ]},
+    "♻️ Repackage Post": { "main": [[{ "node": "📦 Post Ready", "type": "main", "index": 0 }]] },
+    "🎬 Media Regen Entry": { "main": [[{ "node": "🔀 Content Type", "type": "main", "index": 0 }]] },
+    "✏️ Post→Script Revision": { "main": [[{ "node": "🎯 Master Brief Prompt", "type": "main", "index": 0 }]] },
     "♻️ Restore Post Data": { "main": [[{ "node": "🔀 Posting Method?", "type": "main", "index": 0 }]] },
     "🔀 Posting Method?": { "main": [
       [{ "node": "📝 Buffer: Build Post", "type": "main", "index": 0 }],
