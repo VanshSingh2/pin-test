@@ -30,7 +30,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const intake=$('🧠 Intake').first().json;\nconst rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nconst s=rows[0]||{};\nconst d={ niche:s.niche||'', style:s.style||'', platform:s.platform||'instagram', content_type:s.content_type||'video', visual_source:s.visual_source||'ai', image_model:s.image_model||'openai/gpt-image-1', video_model:s.video_model||'google/veo-3.1-lite', posting_method:s.posting_method||'buffer', render_engine:s.render_engine||'ffmpeg', reference:s.reference||'', brand_bible:s.brand_bible||'', pending:s.pending_action||null, history:(s.history||[]) }; const convo=(d.history||[]).slice(-20).map(h=>'U: '+h.u+' / A: '+h.a).join(' || ');\nconst sys=`You are a world-class Creative Director running a multi-platform content studio for one creator. You chat naturally, remember the recent conversation, keep everything ON-BRAND using the brand memory, and ALWAYS CONFIRM before creating. Supported platforms: instagram, youtube, tiktok, pinterest, facebook, both. Video render engines: ffmpeg (fast; clips/stills + captions) or hyperframes (HTML motion graphics, higher quality) — to change it return set_render_engine with value ffmpeg or hyperframes. Recent conversation: ${convo||'(first message)'}.\\n\\nCurrent settings:\\n- niche: \\\"${d.niche||'(not set)'}\\\"\\n- style: \\\"${d.style||'(not set)'}\\\"\\n- platform: ${d.platform}\\n- content_type: ${d.content_type}\\n- visual_source: ${d.visual_source} (ai = AI-generated visuals; pexels/pinterest = real stock clips or images; ai_video = AI-generated motion clips via image-to-video model)\\n- image_model: ${d.image_model}\\n- video_model: ${d.video_model}\\n- posting_method: ${d.posting_method} (buffer or api)\\n- reference (clip search phrase): \\\"${d.reference||'(none)'}\\\"\\n- BRAND BIBLE (keep new work consistent with this): \\\"${d.brand_bible||'(empty — first creation)'}\\\"\\n- pending action: ${d.pending?JSON.stringify(d.pending):'(none)'}\\n\\nYou understand free-form requests. The user can set any of: niche, style, platform, content_type (image|carousel|video), visual_source (ai|pexels|pinterest), image_model, video_model, posting_method (buffer|api), reference. They can also paste a SCRIPT to use, or ask you to decide as the specialist.\\n\\nRules:\\n- If they change any setting => intent=set_config and fill the matching set_* fields (only the ones mentioned).\\n- If they ask to CREATE => intent=propose. Fill action {content_type, platform, topic, script, slide_count, visual_source, posting_method}. Use current settings as defaults; if they didn't specify posting method, you MAY ask in the reply (e.g. 'post via Buffer or API?'). Write a short plan and ask them to reply 'yes'.\\n- Confirm (yes/go/make it) with a pending action => intent=confirm.\\n- cancel => intent=cancel. If they ask to see/show settings, reply (intent=chat) listing current niche, style, platform, visual_source, image_model and posting_method. If they're unsure what to make, suggest 2-3 on-brand ideas that fit the niche+style. Else intent=chat.\\n- If niche or style is missing when creating, ask them to set it first (intent=chat).\\nRespond STRICT JSON only.`;\nconst usr=`User: \\\"${intake.text}\\\"\\nReturn JSON: {\\n \\\"reply\\\":\\\"natural reply\\\",\\n \\\"intent\\\":\\\"set_config|propose|confirm|cancel|chat\\\",\\n \\\"set_niche\\\":\\\"\\\",\\\"set_style\\\":\\\"\\\",\\\"set_platform\\\":\\\"\\\",\\\"set_content_type\\\":\\\"\\\",\\\"set_visual_source\\\":\\\"\\\",\\\"set_image_model\\\":\\\"\\\",\\\"set_video_model\\\":\\\"\\\",\\\"set_posting_method\\\":\\\"\\\",\\\"set_reference\\\":\\\"\\\",\\n \\\"content_type\\\":\\\"\\\",\\\"platform\\\":\\\"\\\",\\\"topic\\\":\\\"\\\",\\\"script\\\":\\\"\\\",\\\"slide_count\\\":5,\\\"visual_source\\\":\\\"\\\",\\\"posting_method\\\":\\\"\\\"\\n}`;\nreturn [{ json:{ chatId:intake.chatId, d, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:900 } } }];"
+        "jsCode": "const intake=$('🧠 Intake').first().json;\nconst rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nconst s=rows[0]||{};\nconst d={ niche:s.niche||'', style:s.style||'', platform:s.platform||'instagram', content_type:s.content_type||'video', visual_source:s.visual_source||'ai', image_model:s.image_model||'openai/gpt-image-1', video_model:s.video_model||'google/veo-3.1-lite', posting_method:s.posting_method||'buffer', render_engine:s.render_engine||'ffmpeg', reference:s.reference||'', post_mode:s.post_mode||'now', post_time:s.post_time||'', brand_bible:s.brand_bible||'', pending:s.pending_action||null, history:(s.history||[]) }; const convo=(d.history||[]).slice(-20).map(h=>'U: '+h.u+' / A: '+h.a).join(' || ');\nconst sys=`You are a world-class Creative Director running a multi-platform content studio for one creator. You chat naturally, remember the recent conversation, keep everything ON-BRAND using the brand memory, and ALWAYS CONFIRM before creating. Supported platforms: instagram, youtube, tiktok, pinterest, facebook, both. Video render engines: ffmpeg (fast; clips/stills + captions) or hyperframes (HTML motion graphics, higher quality) — to change it return set_render_engine with value ffmpeg or hyperframes. Scheduling: to post later say e.g. 'post at 7pm' or 'schedule daily at 19:30' => set_post_mode=scheduled and set_post_time as 24h IST HH:MM; for immediate say 'post now' => set_post_mode=now. Recent conversation: ${convo||'(first message)'}.\\n\\nCurrent settings:\\n- niche: \\\"${d.niche||'(not set)'}\\\"\\n- style: \\\"${d.style||'(not set)'}\\\"\\n- platform: ${d.platform}\\n- content_type: ${d.content_type}\\n- visual_source: ${d.visual_source} (ai = AI-generated visuals; pexels/pinterest = real stock clips or images; ai_video = AI-generated motion clips via image-to-video model)\\n- image_model: ${d.image_model}\\n- video_model: ${d.video_model}\\n- posting_method: ${d.posting_method} (buffer or api)\\n- reference (clip search phrase): \\\"${d.reference||'(none)'}\\\"\\n- post_mode: ${d.post_mode} (now = post right after approval; scheduled = queue until post_time)\\n- post_time: \\\"${d.post_time||'(not set)'}\\\" (IST 24h HH:MM, e.g. 19:30)\\n- BRAND BIBLE (keep new work consistent with this): \\\"${d.brand_bible||'(empty — first creation)'}\\\"\\n- pending action: ${d.pending?JSON.stringify(d.pending):'(none)'}\\n\\nYou understand free-form requests. The user can set any of: niche, style, platform, content_type (image|carousel|video), visual_source (ai|pexels|pinterest), image_model, video_model, posting_method (buffer|api), reference. They can also paste a SCRIPT to use, or ask you to decide as the specialist.\\n\\nRules:\\n- If they change any setting => intent=set_config and fill the matching set_* fields (only the ones mentioned).\\n- If they ask to CREATE => intent=propose. Fill action {content_type, platform, topic, script, slide_count, visual_source, posting_method}. Use current settings as defaults; if they didn't specify posting method, you MAY ask in the reply (e.g. 'post via Buffer or API?'). Write a short plan and ask them to reply 'yes'.\\n- Confirm (yes/go/make it) with a pending action => intent=confirm.\\n- cancel => intent=cancel. If they ask to see/show settings, reply (intent=chat) listing current niche, style, platform, visual_source, image_model and posting_method. If they're unsure what to make, suggest 2-3 on-brand ideas that fit the niche+style. Else intent=chat.\\n- If niche or style is missing when creating, ask them to set it first (intent=chat).\\nRespond STRICT JSON only.`;\nconst usr=`User: \\\"${intake.text}\\\"\\nReturn JSON: {\\n \\\"reply\\\":\\\"natural reply\\\",\\n \\\"intent\\\":\\\"set_config|propose|confirm|cancel|chat\\\",\\n \\\"set_niche\\\":\\\"\\\",\\\"set_style\\\":\\\"\\\",\\\"set_platform\\\":\\\"\\\",\\\"set_content_type\\\":\\\"\\\",\\\"set_visual_source\\\":\\\"\\\",\\\"set_image_model\\\":\\\"\\\",\\\"set_video_model\\\":\\\"\\\",\\\"set_posting_method\\\":\\\"\\\",\\\"set_reference\\\":\\\"\\\",\\\"set_post_mode\\\":\\\"\\\",\\\"set_post_time\\\":\\\"\\\",\\n \\\"content_type\\\":\\\"\\\",\\\"platform\\\":\\\"\\\",\\\"topic\\\":\\\"\\\",\\\"script\\\":\\\"\\\",\\\"slide_count\\\":5,\\\"visual_source\\\":\\\"\\\",\\\"posting_method\\\":\\\"\\\"\\n}`;\nreturn [{ json:{ chatId:intake.chatId, d, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:900 } } }];"
       },
       "id": "cd-brain-build", "name": "🧠 Director Brain Prompt",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-40, 500]
@@ -52,7 +52,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx=$('🧠 Director Brain Prompt').first().json;const d=ctx.d;const p=d.pending||{};\nlet o={};try{o=JSON.parse($input.first().json.choices[0].message.content);}catch(e){const mm=((($input.first().json.choices||[{}])[0].message||{}).content||'').match(/\\{[\\s\\S]*\\}/);if(mm)o=JSON.parse(mm[0]);}\nconst pick=(a,b,c)=>a||b||c||'';\nreturn [{ json:{\n  chatId:ctx.chatId, reply:o.reply||'On it!', intent:o.intent||'chat',\n  niche:d.niche, style:d.style, brand_bible:d.brand_bible,\n  set_niche:o.set_niche||'', set_style:o.set_style||'', set_platform:o.set_platform||'', set_content_type:o.set_content_type||'', set_visual_source:o.set_visual_source||'', set_image_model:o.set_image_model||'', set_video_model:o.set_video_model||'', set_posting_method:o.set_posting_method||'', set_reference:o.set_reference||'', set_render_engine:o.set_render_engine||'', render_engine:d.render_engine,\n  platform: pick(o.platform, p.platform, d.platform),\n  content_type: pick(o.content_type, p.content_type, d.content_type),\n  visual_source: pick(o.visual_source, p.visual_source, d.visual_source),\n  posting_method: pick(o.posting_method, p.posting_method, d.posting_method),\n  image_model:d.image_model, video_model:d.video_model, reference:d.reference,\n  topic: pick(o.topic, p.topic, ''), script: pick(o.script, p.script, ''),\n  slide_count: Number(o.slide_count||p.slide_count||5)\n} }];"
+        "jsCode": "const ctx=$('🧠 Director Brain Prompt').first().json;const d=ctx.d;const p=d.pending||{};\nlet o={};try{o=JSON.parse($input.first().json.choices[0].message.content);}catch(e){const mm=((($input.first().json.choices||[{}])[0].message||{}).content||'').match(/\\{[\\s\\S]*\\}/);if(mm)o=JSON.parse(mm[0]);}\nconst pick=(a,b,c)=>a||b||c||'';\nreturn [{ json:{\n  chatId:ctx.chatId, reply:o.reply||'On it!', intent:o.intent||'chat',\n  niche:d.niche, style:d.style, brand_bible:d.brand_bible,\n  set_niche:o.set_niche||'', set_style:o.set_style||'', set_platform:o.set_platform||'', set_content_type:o.set_content_type||'', set_visual_source:o.set_visual_source||'', set_image_model:o.set_image_model||'', set_video_model:o.set_video_model||'', set_posting_method:o.set_posting_method||'', set_reference:o.set_reference||'', set_render_engine:o.set_render_engine||'', render_engine:d.render_engine, set_post_mode:o.set_post_mode||'', set_post_time:o.set_post_time||'', post_mode:d.post_mode, post_time:d.post_time,\n  platform: pick(o.platform, p.platform, d.platform),\n  content_type: pick(o.content_type, p.content_type, d.content_type),\n  visual_source: pick(o.visual_source, p.visual_source, d.visual_source),\n  posting_method: pick(o.posting_method, p.posting_method, d.posting_method),\n  image_model:d.image_model, video_model:d.video_model, reference:d.reference,\n  topic: pick(o.topic, p.topic, ''), script: pick(o.script, p.script, ''),\n  slide_count: Number(o.slide_count||p.slide_count||5)\n} }];"
       },
       "id": "cd-brain-parse", "name": "📋 Parse Director",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [400, 500]
@@ -80,7 +80,7 @@
           { "name": "Prefer", "value": "resolution=merge-duplicates" }
         ]},
         "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ chat_id:$json.chatId, niche:($json.set_niche||$json.niche||''), style:($json.set_style||$json.style||''), platform:($json.set_platform||$json.platform||'instagram'), content_type:($json.set_content_type||$json.content_type||'video'), visual_source:($json.set_visual_source||$json.visual_source||'ai'), image_model:($json.set_image_model||$json.image_model||'openai/gpt-image-1'), video_model:($json.set_video_model||$json.video_model||'google/veo-3.1-lite'), posting_method:($json.set_posting_method||$json.posting_method||'buffer'), reference:($json.set_reference||$json.reference||''), render_engine:($json.set_render_engine||$json.render_engine||'ffmpeg'), brand_bible:($json.set_style?'':$json.brand_bible), updated_at:$now.toISO() }) }}",
+        "body": "={{ JSON.stringify({ chat_id:$json.chatId, niche:($json.set_niche||$json.niche||''), style:($json.set_style||$json.style||''), platform:($json.set_platform||$json.platform||'instagram'), content_type:($json.set_content_type||$json.content_type||'video'), visual_source:($json.set_visual_source||$json.visual_source||'ai'), image_model:($json.set_image_model||$json.image_model||'openai/gpt-image-1'), video_model:($json.set_video_model||$json.video_model||'google/veo-3.1-lite'), posting_method:($json.set_posting_method||$json.posting_method||'buffer'), reference:($json.set_reference||$json.reference||''), render_engine:($json.set_render_engine||$json.render_engine||'ffmpeg'), post_mode:($json.set_post_mode||$json.post_mode||'now'), post_time:($json.set_post_time||$json.post_time||''), brand_bible:($json.set_style?'':$json.brand_bible), updated_at:$now.toISO() }) }}",
         "options": { "response": { "response": { "neverError": true } } }
       },
       "id": "cd-save-config", "name": "💾 Save Settings",
@@ -469,7 +469,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const m=$('📝 Buffer: Build Post').first().json;\nreturn [{ json:{ chatId:m.chatId, kind:m.kind, platform:m.platform, topic:m.topic, style:m.style, caption:m.caption, media_urls:m.media_urls, visual_source:m.visual_source||'', link:'Queued in Buffer ('+m.platform+')' } }];"
+        "jsCode": "const m=$('📝 Buffer: Build Post').first().json;\nreturn [{ json:{ chatId:m.chatId, kind:m.kind, platform:m.platform, topic:m.topic, style:m.style, caption:m.caption, media_urls:m.media_urls, visual_source:m.visual_source||'', __sched_id:(m.__sched_id||''), link:'Queued in Buffer ('+m.platform+')' } }];"
       },
       "id": "cd-result-buffer", "name": "📋 Result: Buffer",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5220, 720]
@@ -505,7 +505,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const m=$('🔀 API: Video or Pin?').first().json;\nconst resp=$input.first().json;const vid=resp.id||(resp.id&&resp.id.videoId)||null;\nreturn [{ json:{ chatId:m.chatId, kind:m.kind, platform:m.platform, topic:m.topic, style:m.style, caption:m.caption, media_urls:m.media_urls, link: vid?('https://youtu.be/'+vid):'(uploaded)' } }];"
+        "jsCode": "const m=$('🔀 API: Video or Pin?').first().json;\nconst resp=$input.first().json;const vid=resp.id||(resp.id&&resp.id.videoId)||null;\nreturn [{ json:{ chatId:m.chatId, kind:m.kind, platform:m.platform, topic:m.topic, style:m.style, caption:m.caption, media_urls:m.media_urls, __sched_id:(m.__sched_id||''), link: vid?('https://youtu.be/'+vid):'(uploaded)' } }];"
       },
       "id": "cd-result-yt", "name": "📋 Result: YouTube",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5440, 940]
@@ -527,7 +527,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const m=$('🔀 API: Video or Pin?').first().json;\nconst resp=$input.first().json;\nreturn [{ json:{ chatId:m.chatId, kind:m.kind, platform:m.platform, topic:m.topic, style:m.style, caption:m.caption, media_urls:m.media_urls, link: resp.id?('Pinterest pin '+resp.id):'(sent to Pinterest API)' } }];"
+        "jsCode": "const m=$('🔀 API: Video or Pin?').first().json;\nconst resp=$input.first().json;\nreturn [{ json:{ chatId:m.chatId, kind:m.kind, platform:m.platform, topic:m.topic, style:m.style, caption:m.caption, media_urls:m.media_urls, __sched_id:(m.__sched_id||''), link: resp.id?('Pinterest pin '+resp.id):'(sent to Pinterest API)' } }];"
       },
       "id": "cd-result-pin", "name": "📋 Result: Pinterest",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5220, 1140]
@@ -1069,6 +1069,92 @@
       },
       "id": "cd-revise-apply", "name": "✏️ Apply Script Revision",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1780, 1440]
+    },
+    {
+      "parameters": {
+        "jsCode": "const pkg=$json; const lr=$('💾 Load Brand State').first().json; const rows=Array.isArray(lr)?lr:(lr.data||[]); const s=rows[0]||{}; let post_mode=(s.post_mode||'now'); const post_time=(s.post_time||''); function due(t){ if(!t) return null; const m=String(t).match(/(\\d{1,2}):(\\d{2})/); if(!m) return null; const hh=+m[1], mm=+m[2]; const now=new Date(); const ist=new Date(now.getTime()+5.5*3600000); let d=Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), hh, mm, 0)-5.5*3600000; if(d<=now.getTime()) d+=86400000; return new Date(d).toISOString(); } const due_at=due(post_time); if(post_mode==='scheduled' && !due_at) post_mode='now'; return [{ json:{ ...pkg, post_mode, post_time, due_at } }];" },
+      "id": "cd-post-timing", "name": "🕒 Post Timing",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5000, 400]
+    },
+    {
+      "parameters": {
+        "rules": { "values": [
+          { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "id": "sch", "leftValue": "={{ $json.post_mode }}", "rightValue": "scheduled", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "outputKey": "scheduled" }
+        ]}, "options": { "fallbackOutput": "extra" }
+      },
+      "id": "cd-postmode-switch", "name": "🔀 Post Mode?",
+      "type": "n8n-nodes-base.switch", "typeVersion": 3, "position": [5220, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_scheduled",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "return=minimal" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id:$json.chatId, due_at:$json.due_at, status:'pending', payload:$json }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-save-scheduled", "name": "📅 Save Scheduled",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [5440, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('🕒 Post Timing').first().json.chatId }}",
+        "text": "=📅 Scheduled! I'll post your {{ $('🕒 Post Timing').first().json.kind }} to {{ $('🕒 Post Timing').first().json.platform }} at {{ $('🕒 Post Timing').first().json.post_time }} IST (next occurrence).\n\n📝 {{ $('🕒 Post Timing').first().json.caption }}",
+        "additionalFields": {}
+      },
+      "id": "cd-scheduled-confirm", "name": "💬 Scheduled: Confirm",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [5660, 300],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 15 }] }
+      },
+      "id": "cd-sched-trigger", "name": "⏰ Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [-700, 1700]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_scheduled?status=eq.pending&due_at=lte.{{ $now.toISO() }}&select=*&order=due_at.asc",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" }
+        ]},
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-sched-fetch", "name": "📥 Fetch Due Posts",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [-480, 1700]
+    },
+    {
+      "parameters": {
+        "jsCode": "const lr=$json; const rows=Array.isArray(lr)?lr:(lr.data||[]); return rows.map(r=>({ json:{ ...((r.payload)||{}), __sched_id:r.id, post_mode:'now' } }));" },
+      "id": "cd-sched-explode", "name": "📤 Explode Due",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [-260, 1700]
+    },
+    {
+      "parameters": {
+        "method": "PATCH", "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_scheduled?id=eq.{{ $json.__sched_id || '00000000-0000-0000-0000-000000000000' }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "Prefer", "value": "return=minimal" }
+        ]},
+        "sendBody": true, "contentType": "raw", "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ status:'posted', posted_at:$now.toISO() }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "cd-sched-mark", "name": "🗓️ Mark Scheduled Done",
+      "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [6100, 1040]
     }
   ],
 
@@ -1207,7 +1293,16 @@
     "♻️ Repackage Post": { "main": [[{ "node": "📦 Post Ready", "type": "main", "index": 0 }]] },
     "🎬 Media Regen Entry": { "main": [[{ "node": "🔀 Content Type", "type": "main", "index": 0 }]] },
     "✏️ Post→Script Revision": { "main": [[{ "node": "🎯 Master Brief Prompt", "type": "main", "index": 0 }]] },
-    "♻️ Restore Post Data": { "main": [[{ "node": "🔀 Posting Method?", "type": "main", "index": 0 }]] },
+    "♻️ Restore Post Data": { "main": [[{ "node": "🕒 Post Timing", "type": "main", "index": 0 }]] },
+    "🕒 Post Timing": { "main": [[{ "node": "🔀 Post Mode?", "type": "main", "index": 0 }]] },
+    "🔀 Post Mode?": { "main": [
+      [{ "node": "📅 Save Scheduled", "type": "main", "index": 0 }],
+      [{ "node": "🔀 Posting Method?", "type": "main", "index": 0 }]
+    ]},
+    "📅 Save Scheduled": { "main": [[{ "node": "💬 Scheduled: Confirm", "type": "main", "index": 0 }]] },
+    "⏰ Schedule Trigger": { "main": [[{ "node": "📥 Fetch Due Posts", "type": "main", "index": 0 }]] },
+    "📥 Fetch Due Posts": { "main": [[{ "node": "📤 Explode Due", "type": "main", "index": 0 }]] },
+    "📤 Explode Due": { "main": [[{ "node": "🔀 Posting Method?", "type": "main", "index": 0 }]] },
     "🔀 Posting Method?": { "main": [
       [{ "node": "📝 Buffer: Build Post", "type": "main", "index": 0 }],
       [{ "node": "🔀 API: Video or Pin?", "type": "main", "index": 0 }]
@@ -1224,7 +1319,8 @@
     "📋 Result: YouTube":  { "main": [[{ "node": "🧠 Log to Memory", "type": "main", "index": 0 }]] },
     "📌 API: Pinterest Pin": { "main": [[{ "node": "📋 Result: Pinterest", "type": "main", "index": 0 }]] },
     "📋 Result: Pinterest":{ "main": [[{ "node": "🧠 Log to Memory", "type": "main", "index": 0 }]] },
-    "🧠 Log to Memory":    { "main": [[{ "node": "💬 Telegram: Done", "type": "main", "index": 0 }]] }
+    "🧠 Log to Memory":    { "main": [[{ "node": "🗓️ Mark Scheduled Done", "type": "main", "index": 0 }]] },
+    "🗓️ Mark Scheduled Done": { "main": [[{ "node": "💬 Telegram: Done", "type": "main", "index": 0 }]] }
   },
   "active": false,
   "settings": { "executionOrder": "v1", "saveManualExecutions": true },

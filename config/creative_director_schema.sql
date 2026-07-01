@@ -56,3 +56,27 @@ alter table cd_state add column if not exists history jsonb default '[]'::jsonb;
 -- Render engine choice (video): ffmpeg (fast clips/stills + captions) or hyperframes (HTML motion graphics)
 alter table cd_state add column if not exists render_engine text default 'ffmpeg';
 -- HyperFrames requires Node 22+, FFmpeg and headless-Chrome libs on the n8n host (see config/hyperframes_vps_setup.md)
+
+
+
+-- ------------------------------------------------------------
+-- Added later: SCHEDULER (post now vs post at a set IST time)
+-- ------------------------------------------------------------
+-- post_mode: 'now' posts right after you approve; 'scheduled' queues it for post_time.
+-- post_time: 24h IST "HH:MM" (e.g. 19:30). Change both by chatting, e.g. "post daily at 7pm".
+alter table cd_state add column if not exists post_mode text default 'now';
+alter table cd_state add column if not exists post_time text default '';
+
+-- Queue of approved posts waiting for their scheduled time. The "Schedule Trigger"
+-- runs every 15 min, grabs rows whose due_at has passed, posts them, marks them 'posted'.
+create table if not exists cd_scheduled (
+  id         uuid primary key default gen_random_uuid(),
+  chat_id    text,
+  due_at     timestamptz,          -- when to publish (UTC)
+  status     text default 'pending', -- pending | posted
+  payload    jsonb,                -- the full ready-to-post package (media urls, caption, platform...)
+  posted_at  timestamptz,
+  created_at timestamptz default now()
+);
+create index if not exists cd_scheduled_due_idx on cd_scheduled (status, due_at);
+alter table cd_scheduled disable row level security;
