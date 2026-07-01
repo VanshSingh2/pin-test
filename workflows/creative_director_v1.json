@@ -147,7 +147,7 @@
 
     {
       "parameters": {
-        "jsCode": "const m=$json;\nconst job='cd_'+Date.now();\nconst sys=`You are an elite Creative Director and social-media growth specialist. You produce a MASTER CREATIVE BRIEF — engineered for scroll-stopping hooks, watch-time/retention, and saves+shares on the target platform — that downstream image AND video generators follow EXACTLY. In this single pass act as FIVE specialists: (1) Trend Strategist — make the topic timely, specific and fresh, never generic; (2) Script Writer — hook (1-2s pattern interrupt) -> value beats -> payoff -> CTA; (3) Script Doctor — self-review and rewrite any weak line before returning; (4) Art Director — a high-CTR thumbnail/cover direction plus cohesive per-scene visuals; (5) Music Supervisor — choose a background-music mood. Lock visual consistency to the brand bible. Respond STRICT JSON only.`;\nconst usr=`Niche: ${m.niche}\\nStyle: ${m.style}\\nPlatform: ${m.platform}\\nContent type: ${m.content_type}\\nVisual source: ${m.visual_source}\\nExisting brand bible (stay consistent with this): \\\"${m.brand_bible||'(none yet — establish it)'}\\\"\\nTopic: ${m.topic}\\nProvided script (may be empty): \\\"${m.script||''}\\\"\\nSlide count (carousel): ${m.slide_count}\\n\\nReturn JSON:\\n{\\n \\\"style_bible\\\": \\\"1-2 sentences locking palette, lighting, mood, composition, recurring motifs, font feel — reusable for every asset\\\",\\n \\\"updated_brand_bible\\\": \\\"the evolved brand bible to remember for next time (<= 320 chars)\\\",\\n \\\"caption\\\": \\\"platform-ready caption with hook + CTA + relevant hashtags\\\",\\n \\\"title\\\": \\\"<=90 char title (for video/pin)\\\",\\n \\\"hashtags\\\": \\\"space-separated #tags\\\",\\n \\\"image_prompt\\\": \\\"single hero image prompt (for image content)\\\",\\n \\\"slides\\\": [{\\\"headline\\\":\\\"\\\",\\\"image_prompt\\\":\\\"\\\"}],\\n \\\"scenes\\\": [{\\\"narration\\\":\\\"\\\",\\\"on_screen_text\\\":\\\"<=6 words\\\",\\\"image_prompt\\\":\\\"still-frame, vertical 9:16\\\",\\\"motion_prompt\\\":\\\"camera/subject motion\\\",\\\"broll_keyword\\\":\\\"clip search term\\\"}]\\n}\\nQuality bar for outstanding results: the hook (first line / first scene) must stop the scroll in 1-2 seconds (curiosity gap, bold claim, or pattern interrupt); the caption must be native to the platform with a hook line + value + a clear CTA (save/follow/comment); include 8-15 hashtags (mix of broad + niche); keep the topic fresh and specific. Every image_prompt MUST embed the style so all assets look cohesive and on-brand. For video provide 4-5 scenes; for carousel provide ${m.slide_count} slides.`;\nreturn [{ json:{ ...m, job, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.8, max_tokens:2000 } } }];"
+        "jsCode": "const m=$json;\nconst job='cd_'+Date.now();\nconst sys=`You are an elite Creative Director and social-media growth specialist. You produce a MASTER CREATIVE BRIEF — engineered for scroll-stopping hooks, watch-time/retention, and saves+shares on the target platform — that downstream image AND video generators follow EXACTLY. In this single pass act as FIVE specialists: (1) Trend Strategist — make the topic timely, specific and fresh, never generic; (2) Script Writer — hook (1-2s pattern interrupt) -> value beats -> payoff -> CTA; (3) Script Doctor — self-review and rewrite any weak line before returning; (4) Art Director — a high-CTR thumbnail/cover direction plus cohesive per-scene visuals; (5) Music Supervisor — choose a background-music mood. Lock visual consistency to the brand bible. Respond STRICT JSON only.${m.revision_feedback?(' A REVISION WAS REQUESTED — apply it exactly and keep everything else on-brand: '+m.revision_feedback):''}`;\nconst usr=`Niche: ${m.niche}\\nStyle: ${m.style}\\nPlatform: ${m.platform}\\nContent type: ${m.content_type}\\nVisual source: ${m.visual_source}\\nExisting brand bible (stay consistent with this): \\\"${m.brand_bible||'(none yet — establish it)'}\\\"\\nTopic: ${m.topic}\\nProvided script (may be empty): \\\"${m.script||''}\\\"\\nSlide count (carousel): ${m.slide_count}\\n\\nReturn JSON:\\n{\\n \\\"style_bible\\\": \\\"1-2 sentences locking palette, lighting, mood, composition, recurring motifs, font feel — reusable for every asset\\\",\\n \\\"updated_brand_bible\\\": \\\"the evolved brand bible to remember for next time (<= 320 chars)\\\",\\n \\\"caption\\\": \\\"platform-ready caption with hook + CTA + relevant hashtags\\\",\\n \\\"title\\\": \\\"<=90 char title (for video/pin)\\\",\\n \\\"hashtags\\\": \\\"space-separated #tags\\\",\\n \\\"image_prompt\\\": \\\"single hero image prompt (for image content)\\\",\\n \\\"slides\\\": [{\\\"headline\\\":\\\"\\\",\\\"image_prompt\\\":\\\"\\\"}],\\n \\\"scenes\\\": [{\\\"narration\\\":\\\"\\\",\\\"on_screen_text\\\":\\\"<=6 words\\\",\\\"image_prompt\\\":\\\"still-frame, vertical 9:16\\\",\\\"motion_prompt\\\":\\\"camera/subject motion\\\",\\\"broll_keyword\\\":\\\"clip search term\\\"}]\\n}\\nQuality bar for outstanding results: the hook (first line / first scene) must stop the scroll in 1-2 seconds (curiosity gap, bold claim, or pattern interrupt); the caption must be native to the platform with a hook line + value + a clear CTA (save/follow/comment); include 8-15 hashtags (mix of broad + niche); keep the topic fresh and specific. Every image_prompt MUST embed the style so all assets look cohesive and on-brand. For video provide 4-5 scenes; for carousel provide ${m.slide_count} slides.`;\nreturn [{ json:{ ...m, job, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.8, max_tokens:2000 } } }];"
       },
       "id": "cd-brief-build", "name": "🎯 Master Brief Prompt",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [900, 880]
@@ -809,11 +809,13 @@
     },
     {
       "parameters": {
+        "operation": "sendAndWait",
         "chatId": "={{ $('📋 Parse Brief').first().json.chatId }}",
-        "text": "🚫 Script rejected — nothing was created. Send changes or a new request.",
-        "additionalFields": {}
+        "message": "✏️ What should I change about the script? Reply with your edits (e.g. 'punchier hook', 'shorten scene 3', 'different CTA').",
+        "responseType": "freeText",
+        "options": {}
       },
-      "id": "cd-cancel-script", "name": "🚫 Script Cancelled",
+      "id": "cd-revise-script", "name": "✏️ Revise: Script",
       "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [1780, 1260],
       "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
     },
@@ -945,6 +947,13 @@
       "id": "cd-cancel-pinclip", "name": "🚫 Clips Cancelled",
       "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [3680, 1540],
       "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ...$('📋 Parse Director').first().json, revision_feedback: ($json.data && $json.data.text) || '' } }];"
+      },
+      "id": "cd-revise-apply", "name": "✏️ Apply Script Revision",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1780, 1440]
     }
   ],
 
@@ -973,8 +982,10 @@
     "📝 Approve: Script": { "main": [[{ "node": "❓ Script Approved?", "type": "main", "index": 0 }]] },
     "❓ Script Approved?": { "main": [
       [{ "node": "🔀 Content Type", "type": "main", "index": 0 }],
-      [{ "node": "🚫 Script Cancelled", "type": "main", "index": 0 }]
+      [{ "node": "✏️ Revise: Script", "type": "main", "index": 0 }]
     ]},
+    "✏️ Revise: Script": { "main": [[{ "node": "✏️ Apply Script Revision", "type": "main", "index": 0 }]] },
+    "✏️ Apply Script Revision": { "main": [[{ "node": "🎯 Master Brief Prompt", "type": "main", "index": 0 }]] },
     "🔀 Content Type": { "main": [
       [{ "node": "🔀 Image Source", "type": "main", "index": 0 }],
       [{ "node": "🗂️ Carousel: Split Slides", "type": "main", "index": 0 }],
