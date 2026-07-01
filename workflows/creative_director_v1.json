@@ -785,6 +785,80 @@
       },
       "id": "cd-aiv-merge", "name": "📋 AIV: Scenes Ready",
       "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [4500, 1500]
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "={{ $('📋 Parse Brief').first().json.chatId }}",
+        "message": "=📝 Script ready — approve?\n\n🎬 {{ $('📋 Parse Brief').first().json.title }}\n📄 {{ $('📋 Parse Brief').first().json.caption }}\n\nContent: {{ $('📋 Parse Brief').first().json.content_type }} · Scenes/slides: {{ (($('📋 Parse Brief').first().json.scenes||[]).length) || (($('📋 Parse Brief').first().json.slides||[]).length) }}",
+        "responseType": "approval",
+        "approvalOptions": { "values": { "approvalType": "double", "approveLabel": "✅ Approve script", "disapproveLabel": "❌ Reject" } },
+        "options": {}
+      },
+      "id": "cd-gate-script", "name": "📝 Approve: Script",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [1560, 1080],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "sa", "leftValue": "={{ $json.data.approved }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equal" } }], "combinator": "and" }
+      },
+      "id": "cd-if-script", "name": "❓ Script Approved?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [1780, 1080]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('📋 Parse Brief').first().json.chatId }}",
+        "text": "🚫 Script rejected — nothing was created. Send changes or a new request.",
+        "additionalFields": {}
+      },
+      "id": "cd-cancel-script", "name": "🚫 Script Cancelled",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [1780, 1260],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {},
+      "id": "cd-pkg-normalize", "name": "📦 Package Normalize",
+      "type": "n8n-nodes-base.noOp", "typeVersion": 1, "position": [4560, 620]
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "={{ $json.chatId }}",
+        "message": "=🚀 Ready to post — approve?\n\n{{ $json.kind }} → {{ $json.platform }}\n🔗 {{ $json.video_url || $json.media_url }}\n\n📝 {{ $json.caption }}",
+        "responseType": "approval",
+        "approvalOptions": { "values": { "approvalType": "double", "approveLabel": "✅ Post it", "disapproveLabel": "❌ Don't post" } },
+        "options": {}
+      },
+      "id": "cd-gate-post", "name": "🧑‍⚖️ Approve: Post",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [4560, 620],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "pa", "leftValue": "={{ $json.data.approved }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equal" } }], "combinator": "and" }
+      },
+      "id": "cd-if-post", "name": "❓ Post Approved?",
+      "type": "n8n-nodes-base.if", "typeVersion": 2, "position": [4780, 620]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('📦 Package Normalize').first().json }];"
+      },
+      "id": "cd-post-restore", "name": "♻️ Restore Post Data",
+      "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [5000, 540]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('📦 Package Normalize').first().json.chatId }}",
+        "text": "🚫 Post cancelled. The media is saved — ask me to re-post anytime.",
+        "additionalFields": {}
+      },
+      "id": "cd-cancel-post", "name": "🚫 Post Cancelled",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [5000, 720],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
     }
   ],
 
@@ -809,7 +883,12 @@
     "🎯 Master Brief Prompt": { "main": [[{ "node": "🤖 OpenRouter: Master Brief", "type": "main", "index": 0 }]] },
     "🤖 OpenRouter: Master Brief": { "main": [[{ "node": "📋 Parse Brief", "type": "main", "index": 0 }]] },
     "📋 Parse Brief":     { "main": [[{ "node": "🧠 Update Brand Memory", "type": "main", "index": 0 }]] },
-    "🧠 Update Brand Memory": { "main": [[{ "node": "🔀 Content Type", "type": "main", "index": 0 }]] },
+    "🧠 Update Brand Memory": { "main": [[{ "node": "📝 Approve: Script", "type": "main", "index": 0 }]] },
+    "📝 Approve: Script": { "main": [[{ "node": "❓ Script Approved?", "type": "main", "index": 0 }]] },
+    "❓ Script Approved?": { "main": [
+      [{ "node": "🔀 Content Type", "type": "main", "index": 0 }],
+      [{ "node": "🚫 Script Cancelled", "type": "main", "index": 0 }]
+    ]},
     "🔀 Content Type": { "main": [
       [{ "node": "🔀 Image Source", "type": "main", "index": 0 }],
       [{ "node": "🗂️ Carousel: Split Slides", "type": "main", "index": 0 }],
@@ -820,11 +899,11 @@
       [{ "node": "🎨 Image: Generate", "type": "main", "index": 0 }]
     ]},
     "📌 Image: Pinterest Search": { "main": [[{ "node": "🖼️ Image: From Pinterest", "type": "main", "index": 0 }]] },
-    "🖼️ Image: From Pinterest":  { "main": [[{ "node": "🔀 Posting Method?", "type": "main", "index": 0 }]] },
+    "🖼️ Image: From Pinterest":  { "main": [[{ "node": "📦 Package Normalize", "type": "main", "index": 0 }]] },
     "🎨 Image: Generate":  { "main": [[{ "node": "🖼️ Image: Extract", "type": "main", "index": 0 }]] },
     "🖼️ Image: Extract":  { "main": [[{ "node": "☁️ Image: Host", "type": "main", "index": 0 }]] },
     "☁️ Image: Host":      { "main": [[{ "node": "📦 Image: Package", "type": "main", "index": 0 }]] },
-    "📦 Image: Package":   { "main": [[{ "node": "🔀 Posting Method?", "type": "main", "index": 0 }]] },
+    "📦 Image: Package":   { "main": [[{ "node": "📦 Package Normalize", "type": "main", "index": 0 }]] },
     "🗂️ Carousel: Split Slides": { "main": [[{ "node": "🔀 Carousel Source", "type": "main", "index": 0 }]] },
     "🔀 Carousel Source": { "main": [
       [{ "node": "📌 Carousel: Pinterest Search", "type": "main", "index": 0 }],
@@ -835,7 +914,7 @@
     "🎨 Carousel: Slide Image":  { "main": [[{ "node": "🖼️ Carousel: Extract", "type": "main", "index": 0 }]] },
     "🖼️ Carousel: Extract":     { "main": [[{ "node": "☁️ Carousel: Host Slide", "type": "main", "index": 0 }]] },
     "☁️ Carousel: Host Slide":   { "main": [[{ "node": "📦 Carousel: Package", "type": "main", "index": 0 }]] },
-    "📦 Carousel: Package":      { "main": [[{ "node": "🔀 Posting Method?", "type": "main", "index": 0 }]] },
+    "📦 Carousel: Package":      { "main": [[{ "node": "📦 Package Normalize", "type": "main", "index": 0 }]] },
     "🎬 Video: Split Scenes":    { "main": [[{ "node": "🔀 Visual Source", "type": "main", "index": 0 }]] },
     "🔀 Visual Source": { "main": [
       [{ "node": "🎨 Scene: AI Image", "type": "main", "index": 0 }],
@@ -871,11 +950,18 @@
     "🖥️ HF: Render":           { "main": [[{ "node": "📂 HF: Read MP4", "type": "main", "index": 0 }]] },
     "📂 HF: Read MP4":          { "main": [[{ "node": "☁️ HF: Upload", "type": "main", "index": 0 }]] },
     "☁️ HF: Upload":            { "main": [[{ "node": "📦 HF: Package", "type": "main", "index": 0 }]] },
-    "📦 HF: Package":           { "main": [[{ "node": "🔀 Posting Method?", "type": "main", "index": 0 }]] },
+    "📦 HF: Package":           { "main": [[{ "node": "📦 Package Normalize", "type": "main", "index": 0 }]] },
     "🖥️ Video: Render":   { "main": [[{ "node": "📂 Video: Read MP4", "type": "main", "index": 0 }]] },
     "📂 Video: Read MP4":  { "main": [[{ "node": "☁️ Video: Upload Storage", "type": "main", "index": 0 }]] },
     "☁️ Video: Upload Storage": { "main": [[{ "node": "📦 Video: Package", "type": "main", "index": 0 }]] },
-    "📦 Video: Package":   { "main": [[{ "node": "🔀 Posting Method?", "type": "main", "index": 0 }]] },
+    "📦 Video: Package":   { "main": [[{ "node": "📦 Package Normalize", "type": "main", "index": 0 }]] },
+    "📦 Package Normalize": { "main": [[{ "node": "🧑‍⚖️ Approve: Post", "type": "main", "index": 0 }]] },
+    "🧑‍⚖️ Approve: Post": { "main": [[{ "node": "❓ Post Approved?", "type": "main", "index": 0 }]] },
+    "❓ Post Approved?": { "main": [
+      [{ "node": "♻️ Restore Post Data", "type": "main", "index": 0 }],
+      [{ "node": "🚫 Post Cancelled", "type": "main", "index": 0 }]
+    ]},
+    "♻️ Restore Post Data": { "main": [[{ "node": "🔀 Posting Method?", "type": "main", "index": 0 }]] },
     "🔀 Posting Method?": { "main": [
       [{ "node": "📝 Buffer: Build Post", "type": "main", "index": 0 }],
       [{ "node": "🔀 API: Video or Pin?", "type": "main", "index": 0 }]
