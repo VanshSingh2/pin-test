@@ -130,3 +130,9 @@ alter table cd_references disable row level security;
 -- auto_mode: when true, skips the script/image/Pinterest-clip approval gates (only the final
 -- posting approval still fires). Chat-settable ("automate this" / "ask me each time").
 alter table cd_state add column if not exists auto_mode boolean default false;
+
+-- custom_preferences: freeform standing instructions that don't map to a specific setting
+-- (e.g. "no emojis in captions"). Always merged/appended by the Director, injected into
+-- every script/caption/image-prompt generation step automatically. Say "clear my preferences"
+-- to reset it.
+alter table cd_state add column if not exists custom_preferences text default '';
