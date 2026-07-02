@@ -2504,7 +2504,7 @@
       "parameters": {
         "operation": "sendAndWait",
         "chatId": "={{ $json.chatId }}",
-        "message": "={{ $json.__had_missing_scene ? '⚠️ Scene render timed out — used a placeholder background. Review before approving.\\n\\n' : '' }}🚀 Ready to post — approve?\n\n{{ $json.kind }} → {{ ($json.platforms||[]).join(', ') }}\n🔗 {{ $json.video_url || $json.media_url }}\n\n📝 {{ $json.caption }}",
+        "message": "={{ $json.__had_missing_scene ? '⚠️ Scene render timed out — used a placeholder background. Review before approving.\\n\\n' : '' }}🚀 Ready to post — approve?\n\n{{ $json.kind }} → {{ ($json.platforms||[]).join(', ') }}\n🕒 {{ $json.post_mode==='scheduled' ? ('Scheduled: '+$json.due_at_display) : 'Posting immediately on approval' }}\n🔗 {{ $json.video_url || $json.media_url }}\n\n📝 {{ $json.caption }}",
         "responseType": "approval",
         "approvalOptions": {
           "values": {
@@ -2563,7 +2563,7 @@
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: $('📦 Post Ready').first().json }];"
+        "jsCode": "return [{ json: $('🕒 Post Timing').first().json }];"
       },
       "id": "cd-post-restore",
       "name": "♻️ Restore Post Data",
@@ -2612,7 +2612,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const p=$('📦 Post Ready').first().json; const fb=($json.data&&$json.data.text)||''; const nl=String.fromCharCode(10); const sys='You are the post editor for a social media creator. The user rejected a finished post and requested a change. Respond as strict JSON with keys: action, new_caption, new_title. action must be one of: caption (only wording/caption/title/hashtags change, no re-render), remedia (they want a new or different video or images or subtitles but the SAME topic and script), rescript (the script, story, hook or narration should change). When action is caption, rewrite new_caption keeping a strong hook, CTA and relevant hashtags in the brand voice, and set new_title if the title should change; otherwise leave new_caption and new_title empty.'; const usr='Current title: '+(p.title||'')+nl+'Current caption: '+(p.caption||'')+nl+'Content type: '+(p.kind||'')+nl+'Platform: '+((p.platforms||[]).join(', '))+nl+'User request: '+fb; return [{ json:{ ...p, revision_feedback:fb, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:800 } } }];"
+        "jsCode": "const p=$('📦 Post Ready').first().json; const pt=$('🕒 Post Timing').first().json; const fb=($json.data&&$json.data.text)||''; const nl=String.fromCharCode(10); const sys='You are the post editor for a social media creator. The user rejected a finished post and requested a change. Respond as strict JSON with keys: action, new_caption, new_title, new_time. action must be one of: caption (only wording/caption/title/hashtags change, no re-render), remedia (they want a new or different video or images or subtitles but the SAME topic and script), rescript (the script, story, hook or narration should change), retime (they only want to change WHEN it posts, nothing about the content). When action is retime, set new_time to a 24h IST HH:MM string extracted from their request, or the literal string 'now' if they want it posted immediately instead of scheduled. When action is caption, rewrite new_caption keeping a strong hook, CTA and relevant hashtags in the brand voice, and set new_title if the title should change; otherwise leave new_caption and new_title empty.'; const usr='Current title: '+(p.title||'')+nl+'Current caption: '+(p.caption||'')+nl+'Content type: '+(p.kind||'')+nl+'Platform: '+((p.platforms||[]).join(', '))+nl+'Current schedule: '+(pt.post_mode==='scheduled'?('scheduled at '+pt.post_time+' IST'):'posting now')+nl+'User request: '+fb; return [{ json:{ ...p, revision_feedback:fb, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:800 } } }];"
       },
       "id": "cd-postrev-prompt",
       "name": "🧠 Post Revision Prompt",
@@ -2666,7 +2666,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const p=$('📦 Post Ready').first().json; const _resp=$input.first().json; if(!_resp.choices||!_resp.choices[0]){ throw new Error('OpenRouter call failed or returned no choices: ' + JSON.stringify(_resp).slice(0,300)); }\nlet o={}; try{ o=JSON.parse(_resp.choices[0].message.content); }catch(e){ const mm=((($input.first().json.choices||[{}])[0].message||{}).content||'').match(/\\{[\\s\\S]*\\}/); if(mm)o=JSON.parse(mm[0]); } const action=(o.action||'remedia').toLowerCase(); const caption=o.new_caption?o.new_caption:p.caption; const title=o.new_title?o.new_title:p.title; return [{ json:{ ...p, action, caption, title, revision_feedback:$('🧠 Post Revision Prompt').first().json.revision_feedback } }];"
+        "jsCode": "const p=$('📦 Post Ready').first().json; const _resp=$input.first().json; if(!_resp.choices||!_resp.choices[0]){ throw new Error('OpenRouter call failed or returned no choices: ' + JSON.stringify(_resp).slice(0,300)); }\nlet o={}; try{ o=JSON.parse(_resp.choices[0].message.content); }catch(e){ const mm=((($input.first().json.choices||[{}])[0].message||{}).content||'').match(/\\{[\\s\\S]*\\}/); if(mm)o=JSON.parse(mm[0]); } const action=(o.action||'remedia').toLowerCase(); const new_time=o.new_time||''; const caption=o.new_caption?o.new_caption:p.caption; const title=o.new_title?o.new_title:p.title; return [{ json:{ ...p, action, caption, title, new_time, revision_feedback:$('🧠 Post Revision Prompt').first().json.revision_feedback } }];"
       },
       "id": "cd-postrev-parse",
       "name": "📋 Parse Post Revision",
@@ -2724,6 +2724,28 @@
                 "combinator": "and"
               },
               "outputKey": "rescript"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "id": "rtm",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "retime",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "retime"
             }
           ]
         },
@@ -3141,7 +3163,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const pkg=$json; const lr=$('💾 Load Brand State').first().json; const rows=Array.isArray(lr)?lr:(lr.data||[]); const s=rows[0]||{}; let post_mode=(s.post_mode||'now'); const post_time=(s.post_time||''); function due(t){ if(!t) return null; const m=String(t).match(/(\\d{1,2}):(\\d{2})/); if(!m) return null; const hh=+m[1], mm=+m[2]; const now=new Date(); const ist=new Date(now.getTime()+5.5*3600000); let d=Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), hh, mm, 0)-5.5*3600000; if(d<=now.getTime()) d+=86400000; return new Date(d).toISOString(); } const due_at=due(post_time); if(post_mode==='scheduled' && !due_at) post_mode='now'; return [{ json:{ ...pkg, post_mode, post_time, due_at } }];"
+        "jsCode": "const pkg=$json; const lr=$('💾 Load Brand State').first().json; const rows=Array.isArray(lr)?lr:(lr.data||[]); const s=rows[0]||{}; let post_mode=(pkg.post_mode||s.post_mode||'now'); const post_time=(pkg.post_time||s.post_time||'');\nconst batchIdx=(function(){ try{ return $('🔁 Batch: Init').first().json.__batch_index||1; }catch(e){ return 1; } })();\nfunction due(t){ if(!t) return null; const m=String(t).match(/(\\d{1,2}):(\\d{2})/); if(!m) return null; const hh=+m[1], mm=+m[2]; const now=new Date(); const ist=new Date(now.getTime()+5.5*3600000); let d=Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), hh, mm, 0)-5.5*3600000; if(d<=now.getTime()) d+=86400000; d += (batchIdx-1)*2*3600000; return new Date(d).toISOString(); }\nconst due_at=due(post_time); if(post_mode==='scheduled' && !due_at) post_mode='now';\nconst due_at_display=(function(){ if(!due_at) return ''; const dd=new Date(new Date(due_at).getTime()+5.5*3600000); const hh=String(dd.getUTCHours()).padStart(2,'0'); const mi=String(dd.getUTCMinutes()).padStart(2,'0'); return hh+':'+mi+' IST'; })();\nreturn [{ json:{ ...pkg, post_mode, post_time, due_at, due_at_display } }];"
       },
       "id": "cd-post-timing",
       "name": "🕒 Post Timing",
@@ -3948,6 +3970,19 @@
       "position": [
         -260,
         360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = $('🕒 Post Timing').first().json;\nconst nt = ($json.new_time||'').trim();\nconst post_mode = (nt.toLowerCase()==='now') ? 'now' : 'scheduled';\nconst post_time = (post_mode==='scheduled' && nt) ? nt : base.post_time;\nreturn [{ json: { ...base, post_mode, post_time } }];"
+      },
+      "id": "cd-postrev-repackage-retime",
+      "name": "♻️ Repackage Post (Retime)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5880,
+        1260
       ]
     }
   ],
@@ -5058,7 +5093,7 @@
       "main": [
         [
           {
-            "node": "🧑‍⚖️ Approve: Post",
+            "node": "🕒 Post Timing",
             "type": "main",
             "index": 0
           }
@@ -5156,6 +5191,13 @@
         ],
         [
           {
+            "node": "♻️ Repackage Post (Retime)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "🎬 Media Regen Entry",
             "type": "main",
             "index": 0
@@ -5200,7 +5242,7 @@
       "main": [
         [
           {
-            "node": "🕒 Post Timing",
+            "node": "🔀 Post Mode?",
             "type": "main",
             "index": 0
           }
@@ -5211,7 +5253,7 @@
       "main": [
         [
           {
-            "node": "🔀 Post Mode?",
+            "node": "🧑‍⚖️ Approve: Post",
             "type": "main",
             "index": 0
           }
@@ -5667,6 +5709,17 @@
         [
           {
             "node": "💾 Load Brand State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "♻️ Repackage Post (Retime)": {
+      "main": [
+        [
+          {
+            "node": "🕒 Post Timing",
             "type": "main",
             "index": 0
           }
