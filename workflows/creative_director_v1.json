@@ -474,7 +474,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const m=$json;\nconst job='cd_'+Date.now();\nconst sys=`You are an elite Creative Director and social-media growth specialist. You produce a MASTER CREATIVE BRIEF — engineered for scroll-stopping hooks, watch-time/retention, and saves+shares on the target platform — that downstream image AND video generators follow EXACTLY. In this single pass act as FIVE specialists: (1) Trend Strategist — make the topic timely, specific and fresh, never generic; (2) Script Writer — hook (1-2s pattern interrupt) -> value beats -> payoff -> CTA; (3) Script Doctor — self-review and rewrite any weak line before returning; (4) Art Director — a high-CTR thumbnail/cover direction plus cohesive per-scene visuals; (5) Music Supervisor — choose a background-music mood. Lock visual consistency to the brand bible. Respond STRICT JSON only.${m.winners?(' Historically top-performing angles/styles to lean into when relevant: '+m.winners+'.'):''}${m.revision_feedback?(' A REVISION WAS REQUESTED — apply it exactly and keep everything else on-brand: '+m.revision_feedback):''}`;\nconst usr=`Niche: ${m.niche}\\nStyle: ${m.style}\\nPlatform: ${(m.platforms||[]).join(', ')}\\nContent type: ${m.content_type}\\nVisual source: ${m.visual_source}\\nExisting brand bible (stay consistent with this): \\\"${m.brand_bible||'(none yet — establish it)'}\\\"\\nTopic: ${m.topic}\\nProvided script (may be empty): \\\"${m.script||''}\\\"\\nSlide count (carousel): ${m.slide_count}\\n\\nReturn JSON:\\n{\\n \\\"style_bible\\\": \\\"1-2 sentences locking palette, lighting, mood, composition, recurring motifs, font feel — reusable for every asset\\\",\\n \\\"updated_brand_bible\\\": \\\"the evolved brand bible to remember for next time (<= 320 chars)\\\",\\n \\\"caption\\\": \\\"platform-ready caption with hook + CTA + relevant hashtags\\\",\\n \\\"title\\\": \\\"<=90 char title (for video/pin)\\\",\\n \\\"hashtags\\\": \\\"space-separated #tags\\\",\\n \\\"image_prompt\\\": \\\"single hero image prompt (for image content)\\\",\\n \\\"slides\\\": [{\\\"headline\\\":\\\"\\\",\\\"image_prompt\\\":\\\"\\\"}],\\n \\\"scenes\\\": [{\\\"narration\\\":\\\"\\\",\\\"on_screen_text\\\":\\\"<=6 words\\\",\\\"image_prompt\\\":\\\"still-frame, vertical 9:16\\\",\\\"motion_prompt\\\":\\\"camera/subject motion\\\",\\\"broll_keyword\\\":\\\"clip search term\\\"}]\\n}\\nQuality bar for outstanding results: the hook (first line / first scene) must stop the scroll in 1-2 seconds (curiosity gap, bold claim, or pattern interrupt); the caption must be native to the platform with a hook line + value + a clear CTA (save/follow/comment); include 8-15 hashtags (mix of broad + niche); keep the topic fresh and specific. Every image_prompt MUST embed the style so all assets look cohesive and on-brand. For video provide 4-5 scenes; for carousel provide ${m.slide_count} slides.`;\nreturn [{ json:{ ...m, job, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.8, max_tokens:2000 } } }];"
+        "jsCode": "const m=$json;\nconst job='cd_'+Date.now()+'_'+(m.__batch_index||1);\nconst variationNote = (m.__batch_total>1) ? (' This is variation '+m.__batch_index+' of '+m.__batch_total+' for the same topic — keep the niche/style consistent but make the hook/angle/wording fresh and non-repetitive versus earlier ones.') : '';\nconst sys=`You are an elite Creative Director and social-media growth specialist. You produce a MASTER CREATIVE BRIEF — engineered for scroll-stopping hooks, watch-time/retention, and saves+shares on the target platform — that downstream image AND video generators follow EXACTLY. In this single pass act as FIVE specialists: (1) Trend Strategist — make the topic timely, specific and fresh, never generic; (2) Script Writer — hook (1-2s pattern interrupt) -> value beats -> payoff -> CTA; (3) Script Doctor — self-review and rewrite any weak line before returning; (4) Art Director — a high-CTR thumbnail/cover direction plus cohesive per-scene visuals; (5) Music Supervisor — choose a background-music mood. Lock visual consistency to the brand bible. Respond STRICT JSON only.${variationNote}${m.winners?(' Historically top-performing angles/styles to lean into when relevant: '+m.winners+'.'):''}${m.revision_feedback?(' A REVISION WAS REQUESTED — apply it exactly and keep everything else on-brand: '+m.revision_feedback):''}`;\nconst usr=`Niche: ${m.niche}\\nStyle: ${m.style}\\nPlatform: ${(m.platforms||[]).join(', ')}\\nContent type: ${m.content_type}\\nVisual source: ${m.visual_source}\\nExisting brand bible (stay consistent with this): \\\"${m.brand_bible||'(none yet — establish it)'}\\\"\\nTopic: ${m.topic}\\nProvided script (may be empty): \\\"${m.script||''}\\\"\\nSlide count (carousel): ${m.slide_count}\\n\\nReturn JSON:\\n{\\n \\\"style_bible\\\": \\\"1-2 sentences locking palette, lighting, mood, composition, recurring motifs, font feel — reusable for every asset\\\",\\n \\\"updated_brand_bible\\\": \\\"the evolved brand bible to remember for next time (<= 320 chars)\\\",\\n \\\"caption\\\": \\\"platform-ready caption with hook + CTA + relevant hashtags\\\",\\n \\\"title\\\": \\\"<=90 char title (for video/pin)\\\",\\n \\\"hashtags\\\": \\\"space-separated #tags\\\",\\n \\\"image_prompt\\\": \\\"single hero image prompt (for image content)\\\",\\n \\\"slides\\\": [{\\\"headline\\\":\\\"\\\",\\\"image_prompt\\\":\\\"\\\"}],\\n \\\"scenes\\\": [{\\\"narration\\\":\\\"\\\",\\\"on_screen_text\\\":\\\"<=6 words\\\",\\\"image_prompt\\\":\\\"still-frame, vertical 9:16\\\",\\\"motion_prompt\\\":\\\"camera/subject motion\\\",\\\"broll_keyword\\\":\\\"clip search term\\\"}]\\n}\\nQuality bar for outstanding results: the hook (first line / first scene) must stop the scroll in 1-2 seconds (curiosity gap, bold claim, or pattern interrupt); the caption must be native to the platform with a hook line + value + a clear CTA (save/follow/comment); include 8-15 hashtags (mix of broad + niche); keep the topic fresh and specific. Every image_prompt MUST embed the style so all assets look cohesive and on-brand. For video provide 4-5 scenes; for carousel provide ${m.slide_count} slides.`;\nreturn [{ json:{ ...m, job, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.8, max_tokens:2000 } } }];"
       },
       "id": "cd-brief-build",
       "name": "🎯 Master Brief Prompt",
@@ -3716,6 +3716,50 @@
           "name": "Telegram Bot"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = $('📋 Parse Director').first().json;\nlet prevIdx = 0;\ntry { const all = $('🔁 Batch: Init').all(); prevIdx = (all[all.length-1].json.__batch_index) || 0; } catch(e) {}\nconst index = prevIdx + 1;\nconst total = Number(base.posts_per_platform || 2) || 2;\nreturn [{ json: { ...base, __batch_total: total, __batch_index: index } }];"
+      },
+      "id": "cd-batch-init",
+      "name": "🔁 Batch: Init",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        1060
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "bn",
+              "leftValue": "={{ $('🔁 Batch: Init').first().json.__batch_index }}",
+              "rightValue": "={{ $('🔁 Batch: Init').first().json.__batch_total }}",
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "cd-batch-next-if",
+      "name": "🔁 Batch: Next?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        6440,
+        1000
+      ]
     }
   ],
   "connections": {
@@ -3819,7 +3863,7 @@
         ],
         [
           {
-            "node": "🎯 Master Brief Prompt",
+            "node": "🔁 Batch: Init",
             "type": "main",
             "index": 0
           }
@@ -5331,6 +5375,51 @@
             "index": 0
           }
         ]
+      ]
+    },
+    "🔁 Batch: Init": {
+      "main": [
+        [
+          {
+            "node": "🎯 Master Brief Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💬 Telegram: Done": {
+      "main": [
+        [
+          {
+            "node": "🔁 Batch: Next?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💬 Telegram: Post Failed": {
+      "main": [
+        [
+          {
+            "node": "🔁 Batch: Next?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔁 Batch: Next?": {
+      "main": [
+        [
+          {
+            "node": "🔁 Batch: Init",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },
