@@ -1367,7 +1367,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const m=$json;\nconst map={ instagram:$vars.BUFFER_PROFILE_ID_INSTAGRAM, youtube:$vars.BUFFER_PROFILE_ID_YOUTUBE, tiktok:$vars.BUFFER_PROFILE_ID_TIKTOK, pinterest:$vars.BUFFER_PROFILE_ID_PINTEREST, facebook:$vars.BUFFER_PROFILE_ID_FACEBOOK };\nconst platforms = Array.isArray(m.platforms) ? m.platforms : [m.platforms].filter(Boolean);\nconst profiles = platforms.map(p=>map[p]).filter(Boolean);\nconst parts=[];profiles.forEach(p=>parts.push('profile_ids[]='+encodeURIComponent(p)));\nparts.push('text='+encodeURIComponent((m.caption||m.topic)));\nif(m.video_url) parts.push('media[video]='+encodeURIComponent(m.video_url));\nelse if(m.media_url) parts.push('media[photo]='+encodeURIComponent(m.media_url));\nparts.push('now=true');\nreturn [{ json:{ ...m, platforms, bufferBody:parts.join('&') } }];"
+        "jsCode": "const m=$json;\nconst map={ instagram:$vars.BUFFER_PROFILE_ID_INSTAGRAM, youtube:$vars.BUFFER_PROFILE_ID_YOUTUBE, tiktok:$vars.BUFFER_PROFILE_ID_TIKTOK, pinterest:$vars.BUFFER_PROFILE_ID_PINTEREST, facebook:$vars.BUFFER_PROFILE_ID_FACEBOOK };\nconst platforms = Array.isArray(m.platforms) ? m.platforms : [m.platforms].filter(Boolean);\nconst assets = m.video_url ? [{ video:{ url:m.video_url } }] : [{ image:{ url:m.media_url } }];\nconst query = 'mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { id } }';\nreturn platforms.map(p => {\n  const variables = { input: { channelId: map[p]||'', text: (m.caption||m.topic), assets, schedulingType:'automatic', mode:'shareNow' } };\n  return { json: { ...m, platforms, __buffer_platform:p, bufferGraphQL: JSON.stringify({ query, variables }) } };\n});"
       },
       "id": "cd-buffer-build",
       "name": "📝 Buffer: Build Post",
@@ -1381,11 +1381,24 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.bufferapp.com/1/updates/create.json?access_token={{ $vars.BUFFER_ACCESS_TOKEN }}",
+        "url": "https://api.buffer.com",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.BUFFER_ACCESS_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
         "sendBody": true,
         "contentType": "raw",
-        "rawContentType": "application/x-www-form-urlencoded",
-        "body": "={{ $json.bufferBody }}",
+        "rawContentType": "application/json",
+        "body": "={{ $json.bufferGraphQL }}",
         "options": {
           "response": {
             "response": {
@@ -1405,7 +1418,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const m=$('📝 Buffer: Build Post').first().json;\nconst resp=$input.first().json||{};\nlet bid='';try{bid=(resp.updates&&resp.updates[0]&&resp.updates[0].id)||resp.id||'';}catch(e){}\nconst failed = !bid || resp.success===false || !!resp.error || !!resp.code;\nconst errMsg = resp.error || resp.message || 'Buffer did not return a post id';\nreturn [{ json:{ chatId:m.chatId, kind:m.kind, platforms:m.platforms||[], topic:m.topic, style:m.style, caption:m.caption, media_urls:m.media_urls, visual_source:m.visual_source||'', __sched_id:(m.__sched_id||''), buffer_id:bid, link:'Queued in Buffer ('+(m.platforms||[]).join(', ')+')', __post_failed: failed, __post_error: failed ? errMsg : '' } }];"
+        "jsCode": "const m=$('📝 Buffer: Build Post').item.json;\nconst resp=$input.first().json||{};\nconst bid = (resp.data&&resp.data.createPost&&resp.data.createPost.id) || '';\nconst gqlErr = (resp.errors&&resp.errors[0]&&resp.errors[0].message) || '';\nconst failed = !bid || !!gqlErr;\nreturn [{ json:{ chatId:m.chatId, kind:m.kind, platforms:[m.__buffer_platform], topic:m.topic, style:m.style, caption:m.caption, media_urls:m.media_urls, visual_source:m.visual_source||'', __sched_id:(m.__sched_id||''), buffer_id:bid, link:'Buffer: '+m.__buffer_platform+(bid?(' ('+bid+')'):''), __post_failed: failed, __post_error: failed ? (gqlErr||'Buffer did not return a post id') : '' } }];"
       },
       "id": "cd-result-buffer",
       "name": "📋 Result: Buffer",

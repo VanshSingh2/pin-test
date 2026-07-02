@@ -69,6 +69,12 @@ or simply: `make a 6-slide carousel on cold brew myths` · `post an image about 
 
 `platforms` (comma list of instagram·youtube·tiktok·pinterest·facebook — "both" is gone, just name the platforms) · `content_type` (image·carousel·video — validated against each platform's supported types; pinterest has no carousel, tiktok/youtube are video-only) · `visual_source` for image/carousel (ai·pinterest) · `video_route` for video (ai·pinterest·hyperframes — replaces the old visual_source+render_engine combo) · `image_model` (default `openai/gpt-image-1`) · `video_model` · `posting_method` (buffer·api — API posting only works natively for youtube/pinterest; any other platform requested via API automatically falls back to Buffer with a heads-up message) · `post_mode` (now·scheduled) · `post_time` (IST HH:MM) · `style` · `niche` · `reference`.
 
+**Buffer setup (current GraphQL API, not the deprecated legacy REST API):**
+1. Generate an API key at `https://publish.buffer.com/settings/api` → set it as `BUFFER_ACCESS_TOKEN` (used as a Bearer token now, not a query-string access_token).
+2. Connect each platform you want to post to inside Buffer's own dashboard (buffer.com → Connect a channel) — a channel only exists once it's connected there.
+3. Get your organization id and each connected channel's real id/service by POSTing to `https://api.buffer.com` with header `Authorization: Bearer <your key>` and body `{"query":"query { account { organizations { id } } channels(input: { organizationId: \"YOUR_ORG_ID\" }) { id service } }"}` (two calls, or nest them). Match each returned `service` (instagram/youtube/tiktok/pinterest/facebook) to its `id`, and set that as `BUFFER_PROFILE_ID_INSTAGRAM` etc.
+4. Note: `createPost` posts to one channel per call — if you post to multiple platforms via Buffer in the same request, the workflow now sends one GraphQL call per platform (each logs and notifies independently).
+
 **API posting caveat:** Instagram/TikTok have no usable native posting API here (Instagram needs a Graph API container→publish flow with a business token; TikTok needs app review). Requesting `posting_method=api` for those platforms posts via Buffer instead and tells you so — it no longer silently misroutes.
 
 **Failed posts:** if generation succeeds but the actual publish call fails (bad token, rate limit, etc.), you get a "⚠️ posting FAILED" message instead of a false "✅ posted!" — check credentials and retry manually.
