@@ -140,3 +140,10 @@ alter table cd_state add column if not exists custom_preferences text default ''
 -- Video caption/subtitle styling — chat-settable ("make captions yellow and bigger").
 alter table cd_state add column if not exists subtitle_color text default 'white';
 alter table cd_state add column if not exists subtitle_size int default 64;
+
+-- active_job_token: marks a creation as "in flight" for this chat. A new incoming message
+-- while this is set will cancel the in-progress job (clear the token) and proceed with the
+-- new request; any already-paused branch of the old job self-detects the mismatch at the two
+-- staleness guards (before generation starts, before anything posts) and quietly stops instead
+-- of continuing on stale/abandoned work.
+alter table cd_state add column if not exists active_job_token text default '';

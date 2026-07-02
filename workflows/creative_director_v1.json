@@ -3763,7 +3763,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const base = $('📋 Parse Director').first().json;\nlet prevIdx = 0;\ntry { const all = $('🔁 Batch: Init').all(); prevIdx = (all[all.length-1].json.__batch_index) || 0; } catch(e) {}\nconst index = prevIdx + 1;\nconst total = Number(base.posts_per_platform || 2) || 2;\nreturn [{ json: { ...base, __batch_total: total, __batch_index: index } }];"
+        "jsCode": "const base = $('📋 Parse Director').first().json;\nlet prevIdx = 0;\ntry { const all = $('🔁 Batch: Init').all(); prevIdx = (all[all.length-1].json.__batch_index) || 0; } catch(e) {}\nconst index = prevIdx + 1;\nconst total = Number(base.posts_per_platform || 2) || 2;\nconst job_token = 'jt_' + Date.now() + '_' + index;\nreturn [{ json: { ...base, __batch_total: total, __batch_index: index, __job_token: job_token } }];"
       },
       "id": "cd-batch-init",
       "name": "🔁 Batch: Init",
@@ -4326,6 +4326,406 @@
           "name": "Telegram Bot"
         }
       }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_state?on_conflict=chat_id",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, active_job_token: $json.__job_token, updated_at: $now.toISO() }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 2
+      },
+      "id": "cd-set-active-token",
+      "name": "💾 Set Active Job Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        1240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "jif",
+              "leftValue": "={{ (Array.isArray($json)?$json:($json.data||[]))[0] ? ((Array.isArray($json)?$json:($json.data||[]))[0].active_job_token||'') : '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "cd-jobinflight-if",
+      "name": "❓ Job In Flight?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -140,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_state?on_conflict=chat_id",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id: $('🧠 Intake').first().json.chatId, active_job_token: '', pending_action: null, updated_at: $now.toISO() }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 2
+      },
+      "id": "cd-clear-token-interrupt",
+      "name": "💾 Clear Active Job Token (Interrupt)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -140,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('🧠 Intake').first().json.chatId }}",
+        "text": "⏸️ Cancelling the in-progress creation to handle your new request...",
+        "additionalFields": {}
+      },
+      "id": "cd-reply-interrupting",
+      "name": "💬 Reply: Interrupting",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        80,
+        600
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "TG_CRED_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('💾 Load Brand State').first().json }];"
+      },
+      "id": "cd-restore-state-interrupt",
+      "name": "🔗 Restore State After Interrupt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_state?chat_id=eq.{{ $('📋 Parse Director').first().json.chatId }}&select=active_job_token",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "cd-freshcheck-pregen",
+      "name": "📥 Fresh Token Check (Pre-Gen)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1720,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "fg",
+              "leftValue": "={{ (function(){ const rows=Array.isArray($json)?$json:($json.data||[]); const current=(rows[0]&&rows[0].active_job_token)||''; let mine=''; try{ mine=$('🔁 Batch: Init').first().json.__job_token; }catch(e){} return (!!mine && current===mine); })() }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "cd-freshif-pregen",
+      "name": "❓ Job Still Fresh? (Pre-Gen)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1940,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_state?chat_id=eq.{{ $('♻️ Restore Post Data').first().json.chatId }}&select=active_job_token",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "cd-freshcheck-prepost",
+      "name": "📥 Fresh Token Check (Pre-Post)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5220,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const orig = $('♻️ Restore Post Data').first().json;\nconst rows = Array.isArray($json) ? $json : ($json.data||[]);\nconst current = (rows[0]&&rows[0].active_job_token)||'';\nlet mine=''; try{ mine = $('🔁 Batch: Init').first().json.__job_token; }catch(e){}\nreturn [{ json: { ...orig, __fresh: (!!mine && current===mine) } }];"
+      },
+      "id": "cd-freshcode-prepost",
+      "name": "🔗 Merge Fresh Check (Pre-Post)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5340,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "fp",
+              "leftValue": "={{ $json.__fresh }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "cd-freshif-prepost",
+      "name": "❓ Job Still Fresh? (Pre-Post)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        5460,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_state?on_conflict=chat_id",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, active_job_token: '', updated_at: $now.toISO() }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 2
+      },
+      "id": "cd-clear-token-done",
+      "name": "💾 Clear Active Job Token (Done)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5900,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_state?on_conflict=chat_id",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id: $('🕒 Post Timing').first().json.chatId, active_job_token: '', updated_at: $now.toISO() }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 2
+      },
+      "id": "cd-clear-token-scheduled",
+      "name": "💾 Clear Active Job Token (Scheduled)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5440,
+        220
+      ]
     }
   ],
   "connections": {
@@ -4355,7 +4755,7 @@
       "main": [
         [
           {
-            "node": "🧠 Director Brain Prompt",
+            "node": "❓ Job In Flight?",
             "type": "main",
             "index": 0
           }
@@ -4542,7 +4942,7 @@
       "main": [
         [
           {
-            "node": "🔀 Content Type",
+            "node": "📥 Fresh Token Check (Pre-Gen)",
             "type": "main",
             "index": 0
           }
@@ -5562,7 +5962,7 @@
       "main": [
         [
           {
-            "node": "🔀 Content Type",
+            "node": "📥 Fresh Token Check (Pre-Gen)",
             "type": "main",
             "index": 0
           }
@@ -5584,7 +5984,7 @@
       "main": [
         [
           {
-            "node": "🔀 Post Mode?",
+            "node": "📥 Fresh Token Check (Pre-Post)",
             "type": "main",
             "index": 0
           }
@@ -5625,6 +6025,11 @@
         [
           {
             "node": "💬 Scheduled: Confirm",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "💾 Clear Active Job Token (Scheduled)",
             "type": "main",
             "index": 0
           }
@@ -5786,6 +6191,11 @@
         [
           {
             "node": "🗓️ Mark Scheduled Done",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "💾 Clear Active Job Token (Done)",
             "type": "main",
             "index": 0
           }
@@ -5954,7 +6364,7 @@
       "main": [
         [
           {
-            "node": "🎯 Master Brief Prompt",
+            "node": "💾 Set Active Job Token",
             "type": "main",
             "index": 0
           }
@@ -6240,6 +6650,125 @@
             "index": 0
           }
         ]
+      ]
+    },
+    "💾 Set Active Job Token": {
+      "main": [
+        [
+          {
+            "node": "🎯 Master Brief Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Job In Flight?": {
+      "main": [
+        [
+          {
+            "node": "💾 Clear Active Job Token (Interrupt)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🧠 Director Brain Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💾 Clear Active Job Token (Interrupt)": {
+      "main": [
+        [
+          {
+            "node": "💬 Reply: Interrupting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💬 Reply: Interrupting": {
+      "main": [
+        [
+          {
+            "node": "🔗 Restore State After Interrupt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔗 Restore State After Interrupt": {
+      "main": [
+        [
+          {
+            "node": "🧠 Director Brain Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Fresh Token Check (Pre-Gen)": {
+      "main": [
+        [
+          {
+            "node": "❓ Job Still Fresh? (Pre-Gen)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Job Still Fresh? (Pre-Gen)": {
+      "main": [
+        [
+          {
+            "node": "🔀 Content Type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "📥 Fresh Token Check (Pre-Post)": {
+      "main": [
+        [
+          {
+            "node": "🔗 Merge Fresh Check (Pre-Post)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔗 Merge Fresh Check (Pre-Post)": {
+      "main": [
+        [
+          {
+            "node": "❓ Job Still Fresh? (Pre-Post)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Job Still Fresh? (Pre-Post)": {
+      "main": [
+        [
+          {
+            "node": "🔀 Post Mode?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },
