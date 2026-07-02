@@ -111,3 +111,8 @@ alter table cd_state add column if not exists video_route text default 'ai';
 alter table cd_memory add column if not exists platforms jsonb;
 -- posted: false when generation succeeded but the publish step (Buffer/YouTube/Pinterest) failed.
 alter table cd_memory add column if not exists posted boolean default true;
+
+-- posts_per_platform: how many pieces of content per platform per request (foundation for a future batch-generation stage — not yet multiplied into generation)
+alter table cd_state add column if not exists posts_per_platform int default 2;
+-- narration_voice: chat-settable, remembered OpenAI TTS voice used for every video (both ffmpeg and hyperframes engines)
+alter table cd_state add column if not exists narration_voice text default 'onyx';
