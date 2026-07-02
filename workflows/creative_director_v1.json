@@ -2155,7 +2155,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ model: ($json.image_model||'openai/gpt-image-1'), modalities:['image','text'], messages:[{ role:'user', content: ('Vertical 9:16 still, no text in the image. '+$json.image_prompt+$json.style_suffix) }] }) }}",
+        "body": "={{ JSON.stringify({ model: ($json.image_model||'openai/gpt-image-1'), modalities:['image','text'], messages:[{ role:'user', content: ($json.reference_image_url ? [{type:'text',text:('Vertical 9:16 still, no text in the image. '+$json.image_prompt+$json.style_suffix+' Use the attached reference image for visual style/composition guidance.')},{type:'image_url',image_url:{url:$json.reference_image_url}}] : ('Vertical 9:16 still, no text in the image. '+$json.image_prompt+$json.style_suffix)) }] }) }}",
         "options": {
           "timeout": 120000,
           "response": {
@@ -3163,7 +3163,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const pkg=$json; const lr=$('💾 Load Brand State').first().json; const rows=Array.isArray(lr)?lr:(lr.data||[]); const s=rows[0]||{}; let post_mode=(pkg.post_mode||s.post_mode||'now'); const post_time=(pkg.post_time||s.post_time||'');\nconst batchIdx=(function(){ try{ return $('🔁 Batch: Init').first().json.__batch_index||1; }catch(e){ return 1; } })();\nfunction due(t){ if(!t) return null; const m=String(t).match(/(\\d{1,2}):(\\d{2})/); if(!m) return null; const hh=+m[1], mm=+m[2]; const now=new Date(); const ist=new Date(now.getTime()+5.5*3600000); let d=Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), hh, mm, 0)-5.5*3600000; if(d<=now.getTime()) d+=86400000; d += (batchIdx-1)*2*3600000; return new Date(d).toISOString(); }\nconst due_at=due(post_time); if(post_mode==='scheduled' && !due_at) post_mode='now';\nconst due_at_display=(function(){ if(!due_at) return ''; const dd=new Date(new Date(due_at).getTime()+5.5*3600000); const hh=String(dd.getUTCHours()).padStart(2,'0'); const mi=String(dd.getUTCMinutes()).padStart(2,'0'); return hh+':'+mi+' IST'; })();\nreturn [{ json:{ ...pkg, post_mode, post_time, due_at, due_at_display } }];"
+        "jsCode": "const pkg=$json; const lr=$('💾 Load Brand State').first().json; const rows=Array.isArray(lr)?lr:(lr.data||[]); const s=rows[0]||{}; let post_mode=(pkg.post_mode||s.post_mode||'now'); const post_time=(pkg.post_time||s.post_time||'');\nconst batchIdx = pkg.__retimed ? 1 : (function(){ try{ return $('🔁 Batch: Init').first().json.__batch_index||1; }catch(e){ return 1; } })();\nfunction due(t){ if(!t) return null; const m=String(t).match(/(\\d{1,2}):(\\d{2})/); if(!m) return null; const hh=+m[1], mm=+m[2]; const now=new Date(); const ist=new Date(now.getTime()+5.5*3600000); let d=Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), hh, mm, 0)-5.5*3600000; if(d<=now.getTime()) d+=86400000; d += (batchIdx-1)*2*3600000; return new Date(d).toISOString(); }\nconst due_at=due(post_time); if(post_mode==='scheduled' && !due_at) post_mode='now';\nconst due_at_display=(function(){ if(!due_at) return ''; const dd=new Date(new Date(due_at).getTime()+5.5*3600000); const hh=String(dd.getUTCHours()).padStart(2,'0'); const mi=String(dd.getUTCMinutes()).padStart(2,'0'); return hh+':'+mi+' IST'; })();\nreturn [{ json:{ ...pkg, post_mode, post_time, due_at, due_at_display } }];"
       },
       "id": "cd-post-timing",
       "name": "🕒 Post Timing",
@@ -3974,7 +3974,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const base = $('🕒 Post Timing').first().json;\nconst nt = ($json.new_time||'').trim();\nconst post_mode = (nt.toLowerCase()==='now') ? 'now' : 'scheduled';\nconst post_time = (post_mode==='scheduled' && nt) ? nt : base.post_time;\nreturn [{ json: { ...base, post_mode, post_time } }];"
+        "jsCode": "const base = $('🕒 Post Timing').first().json;\nconst nt = ($json.new_time||'').trim();\nconst post_mode = (nt.toLowerCase()==='now') ? 'now' : 'scheduled';\nconst post_time = (post_mode==='scheduled' && nt) ? nt : base.post_time;\nreturn [{ json: { ...base, post_mode, post_time, __retimed:true } }];"
       },
       "id": "cd-postrev-repackage-retime",
       "name": "♻️ Repackage Post (Retime)",
@@ -4591,13 +4591,6 @@
         ],
         [
           {
-            "node": "📷 Scene: Pexels Clip",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
             "node": "📌 Scene: Pinterest Clip",
             "type": "main",
             "index": 0
@@ -4612,7 +4605,7 @@
         ],
         [
           {
-            "node": "📷 Scene: Pexels Clip",
+            "node": "🎥 AIV: Scene Image",
             "type": "main",
             "index": 0
           }
