@@ -2799,7 +2799,7 @@
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: $('📋 Parse Brief').first().json }];"
+        "jsCode": "const b = $('📋 Parse Brief').first().json;\nconst fb = $json.revision_feedback || '';\nconst suffix = fb ? (' -- REVISION: '+fb) : '';\nreturn [{ json: {\n  ...b,\n  image_prompt: (b.image_prompt||'') + suffix,\n  slides: (b.slides||[]).map(s => ({ ...s, image_prompt: (s.image_prompt||'')+suffix })),\n  scenes: (b.scenes||[]).map(s => ({ ...s, image_prompt: (s.image_prompt||'')+suffix }))\n} }];"
       },
       "id": "cd-postrev-remedia",
       "name": "🎬 Media Regen Entry",
@@ -4112,6 +4112,220 @@
         5880,
         1440
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = (($json.data && $json.data.text) || $json.text || '').trim();\nconst isCancel = /^(cancel|nevermind|never mind|stop|start over|forget it|scrap|abort)\\b/i.test(text);\nconst chatId = (function(){ try{ return $('📋 Parse Brief').first().json.chatId; }catch(e){ return $json.chatId||''; } })();\nreturn [{ json: { ...$json, __is_cancel: isCancel, chatId } }];"
+      },
+      "id": "cd-cancelcheck-script",
+      "name": "🔍 Cancel Check (Script)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1900,
+        1440
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "ic",
+              "leftValue": "={{ $json.__is_cancel }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "cd-cancelcheck-script-if",
+      "name": "❓ Is Cancel? (Script)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        1440
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = (($json.data && $json.data.text) || $json.text || '').trim();\nconst isCancel = /^(cancel|nevermind|never mind|stop|start over|forget it|scrap|abort)\\b/i.test(text);\nconst chatId = (function(){ try{ return $('📋 Parse Brief').first().json.chatId; }catch(e){ return $json.chatId||''; } })();\nreturn [{ json: { ...$json, __is_cancel: isCancel, chatId } }];"
+      },
+      "id": "cd-cancelcheck-post",
+      "name": "🔍 Cancel Check (Post)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5120,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "ic",
+              "leftValue": "={{ $json.__is_cancel }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "cd-cancelcheck-post-if",
+      "name": "❓ Is Cancel? (Post)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        5280,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = (($json.data && $json.data.text) || $json.text || '').trim();\nconst isCancel = /^(cancel|nevermind|never mind|stop|start over|forget it|scrap|abort)\\b/i.test(text);\nconst chatId = (function(){ try{ return $('📋 Parse Brief').first().json.chatId; }catch(e){ return $json.chatId||''; } })();\nreturn [{ json: { ...$json, __is_cancel: isCancel, chatId } }];"
+      },
+      "id": "cd-cancelcheck-aiimg",
+      "name": "🔍 Cancel Check (AI Images)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3740,
+        2040
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "ic",
+              "leftValue": "={{ $json.__is_cancel }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "cd-cancelcheck-aiimg-if",
+      "name": "❓ Is Cancel? (AI Images)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3900,
+        2040
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_state?on_conflict=chat_id",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id: $json.chatId, pending_action: null, updated_at: $now.toISO() }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 2
+      },
+      "id": "cd-clearpending-midflow",
+      "name": "💾 Clear Pending (Mid-flow)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2100,
+        1560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let chatId='';\ntry{ chatId = $('🔍 Cancel Check (Script)').first().json.chatId; }catch(e){}\nif(!chatId){ try{ chatId = $('🔍 Cancel Check (Post)').first().json.chatId; }catch(e){} }\nif(!chatId){ try{ chatId = $('🔍 Cancel Check (AI Images)').first().json.chatId; }catch(e){} }\nreturn [{ json: { chatId } }];"
+      },
+      "id": "cd-restore-cancel-chatid",
+      "name": "🔗 Restore Cancel ChatId",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2320,
+        1560
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "🚫 Cancelled — the in-progress creation was dropped. Send your next request whenever you’re ready (e.g. \"make a video instead\").",
+        "additionalFields": {}
+      },
+      "id": "cd-replycancelled-midflow",
+      "name": "💬 Reply: Cancelled (Mid-flow)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2540,
+        1560
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "TG_CRED_ID",
+          "name": "Telegram Bot"
+        }
+      }
     }
   ],
   "connections": {
@@ -4346,7 +4560,7 @@
       "main": [
         [
           {
-            "node": "✏️ Apply Script Revision",
+            "node": "🔍 Cancel Check (Script)",
             "type": "main",
             "index": 0
           }
@@ -4735,7 +4949,7 @@
       "main": [
         [
           {
-            "node": "🧩 Plan Image Revision",
+            "node": "🔍 Cancel Check (AI Images)",
             "type": "main",
             "index": 0
           }
@@ -5254,7 +5468,7 @@
       "main": [
         [
           {
-            "node": "🧠 Post Revision Prompt",
+            "node": "🔍 Cancel Check (Post)",
             "type": "main",
             "index": 0
           }
@@ -5913,6 +6127,115 @@
         [
           {
             "node": "🎞️ Video: Build FFmpeg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Cancel Check (Script)": {
+      "main": [
+        [
+          {
+            "node": "❓ Is Cancel? (Script)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Is Cancel? (Script)": {
+      "main": [
+        [
+          {
+            "node": "💾 Clear Pending (Mid-flow)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "✏️ Apply Script Revision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Cancel Check (Post)": {
+      "main": [
+        [
+          {
+            "node": "❓ Is Cancel? (Post)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Is Cancel? (Post)": {
+      "main": [
+        [
+          {
+            "node": "💾 Clear Pending (Mid-flow)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🧠 Post Revision Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Cancel Check (AI Images)": {
+      "main": [
+        [
+          {
+            "node": "❓ Is Cancel? (AI Images)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Is Cancel? (AI Images)": {
+      "main": [
+        [
+          {
+            "node": "💾 Clear Pending (Mid-flow)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🧩 Plan Image Revision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💾 Clear Pending (Mid-flow)": {
+      "main": [
+        [
+          {
+            "node": "🔗 Restore Cancel ChatId",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔗 Restore Cancel ChatId": {
+      "main": [
+        [
+          {
+            "node": "💬 Reply: Cancelled (Mid-flow)",
             "type": "main",
             "index": 0
           }
