@@ -72,7 +72,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const intake=$('🧠 Intake').first().json;\nconst refs=(function(){ try{ const r=$('📥 Load References').first().json; return Array.isArray(r)?r:(r.data||[]); }catch(e){ return []; } })();\nconst rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nconst s=rows[0]||{};\nconst d={ niche:s.niche||'', style:s.style||'', platforms:(Array.isArray(s.platforms)&&s.platforms.length?s.platforms:['instagram']), video_route:s.video_route||'ai', posts_per_platform:(s.posts_per_platform||2), narration_voice:(s.narration_voice||$vars.OPENAI_TTS_VOICE||'onyx'), content_type:s.content_type||'video', visual_source:s.visual_source||'ai', image_model:s.image_model||'openai/gpt-image-1', video_model:s.video_model||'google/veo-3.1-lite', posting_method:s.posting_method||'buffer', render_engine:s.render_engine||'ffmpeg', reference:s.reference||'', post_mode:s.post_mode||'now', post_time:s.post_time||'', winners:s.winners||'', brand_bible:s.brand_bible||'', pending:s.pending_action||null, history:(s.history||[]) }; const convo=(d.history||[]).slice(-20).map(h=>'U: '+h.u+' / A: '+h.a).join(' || ');\nconst sys=`You are a world-class Creative Director running a multi-platform content studio for one creator. You chat naturally, remember the recent conversation, keep everything ON-BRAND using the brand memory, and ALWAYS CONFIRM before creating. Supported platforms: instagram, youtube, tiktok, pinterest, facebook (use a comma list for multiple, e.g. \"instagram, pinterest\" — no more \"both\"). Platform content rules — enforce when the user requests or confirms content: pinterest: image or video only (no carousel); instagram: image, carousel, or video; tiktok: video only; youtube: video only; facebook: image, carousel, or video. If a requested content_type isn't supported on a requested platform, drop that platform and say so in the reply (or ask them to pick a supported type/platform if none of them work). video_route (video only, replaces the old visual_source+render_engine choice for video) is one of: ai (AI images animated via image-to-video model, edited with FFmpeg), pinterest (real Pinterest clips, edited with FFmpeg), hyperframes (HyperFrames renders the motion graphics itself, captions/audio baked in) — change via set_video_route. Image/carousel keep visual_source (ai|pinterest) via set_visual_source. Scheduling: to post later say e.g. 'post at 7pm' or 'schedule daily at 19:30' => set_post_mode=scheduled and set_post_time as 24h IST HH:MM; for immediate say 'post now' => set_post_mode=now. Recent conversation: ${convo||'(first message)'}.\\n\\nCurrent settings:\\n- niche: \\\"${d.niche||'(not set)'}\\\"\\n- style: \\\"${d.style||'(not set)'}\\\"\\n- platforms: ${d.platforms.join(', ')}\\n- content_type: ${d.content_type}\\n- visual_source (image/carousel): ${d.visual_source} (ai = AI-generated; pinterest = real Pinterest images)\\n- video_route (video only): ${d.video_route} (ai|pinterest|hyperframes)\\n- posts_per_platform: ${d.posts_per_platform} (how many pieces of content per platform per request)\\n- narration_voice: ${d.narration_voice} (OpenAI TTS voice, used for every video)\\n- image_model: ${d.image_model}\\n- video_model: ${d.video_model}\\n- posting_method: ${d.posting_method} (buffer or api)\\n- reference (clip search phrase): \\\"${d.reference||'(none)'}\\\"\\n- post_mode: ${d.post_mode} (now = post right after approval; scheduled = queue until post_time)\\n- post_time: \\\"${d.post_time||'(not set)'}\\\" (IST 24h HH:MM, e.g. 19:30)\\n- BRAND BIBLE (keep new work consistent with this): \\\"${d.brand_bible||'(empty — first creation)'}\\\"\\n- pending action: ${d.pending?JSON.stringify(d.pending):'(none)'}\\n\\nTop-performing past posts (lean into these winning angles/styles when it fits the niche): ${d.winners||'(no analytics yet)'}.\\n\\nSaved reference images available by exact name: ${refs.map(r=>r.name).join(', ')||'(none yet — user can send a photo with a caption naming it to save one)'}. If the user asks to use one when creating content, set reference_name to that exact saved name.\\n\\nYou understand free-form requests. The user can set any of: niche, style, platforms (comma list, e.g. \"instagram,pinterest\"), content_type (image|carousel|video), visual_source for image/carousel (ai|pinterest), video_route for video (ai|pinterest|hyperframes), posts_per_platform (integer, default 2), narration_voice (an OpenAI TTS voice name), image_model, video_model, posting_method (buffer|api), reference. They can also paste a SCRIPT to use, or ask you to decide as the specialist.\\n\\nRules:\\n- If they change any setting => intent=set_config and fill the matching set_* fields (only the ones mentioned).\\n- If they ask to CREATE => intent=propose. Fill action {content_type, platform, topic, script, slide_count, visual_source, posting_method}. Use current settings as defaults; if they didn't specify posting method, you MAY ask in the reply (e.g. 'post via Buffer or API?'). Write a short plan and ask them to reply 'yes'.\\n- Confirm (yes/go/make it) with a pending action => intent=confirm.\\n- cancel => intent=cancel. If they ask to see/show settings, reply (intent=chat) listing current niche, style, platform, visual_source, image_model and posting_method. If they're unsure what to make, suggest 2-3 on-brand ideas that fit the niche+style. Else intent=chat.\\n- If niche or style is missing when creating, ask them to set it first (intent=chat).\\nRespond STRICT JSON only.`;\nconst usr=`User: \\\"${intake.text}\\\"\\nReturn JSON: {\\n \\\"reply\\\":\\\"natural reply\\\",\\n \\\"intent\\\":\\\"set_config|propose|confirm|cancel|chat\\\",\\n \\\"set_niche\\\":\\\"\\\",\\\"set_style\\\":\\\"\\\",\\\"set_platforms\\\":\\\"\\\",\\\"set_content_type\\\":\\\"\\\",\\\"set_visual_source\\\":\\\"\\\",\\\"set_video_route\\\":\\\"\\\",\\\"set_posts_per_platform\\\":\\\"\\\",\\\"set_narration_voice\\\":\\\"\\\",\\\"set_image_model\\\":\\\"\\\",\\\"set_video_model\\\":\\\"\\\",\\\"set_posting_method\\\":\\\"\\\",\\\"set_reference\\\":\\\"\\\",\\\"set_post_mode\\\":\\\"\\\",\\\"set_post_time\\\":\\\"\\\",\\n \\\"content_type\\\":\\\"\\\",\\\"platforms\\\":\\\"\\\",\\\"reference_name\\\":\\\"\\\",\\\"topic\\\":\\\"\\\",\\\"script\\\":\\\"\\\",\\\"slide_count\\\":5,\\\"visual_source\\\":\\\"\\\",\\\"video_route\\\":\\\"\\\",\\\"posting_method\\\":\\\"\\\"\\n}`;\nreturn [{ json:{ chatId:intake.chatId, d, refs, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:900 } } }];"
+        "jsCode": "const intake=$('🧠 Intake').first().json;\nconst refs=(function(){ try{ const r=$('📥 Load References').first().json; return Array.isArray(r)?r:(r.data||[]); }catch(e){ return []; } })();\nconst rows=Array.isArray($input.first().json)?$input.first().json:($input.first().json.data||[]);\nconst s=rows[0]||{};\nconst d={ niche:s.niche||'', style:s.style||'', platforms:(Array.isArray(s.platforms)&&s.platforms.length?s.platforms:['instagram']), video_route:s.video_route||'ai', posts_per_platform:(s.posts_per_platform||2), narration_voice:(s.narration_voice||$vars.OPENAI_TTS_VOICE||'onyx'), auto_mode:!!s.auto_mode, content_type:s.content_type||'video', visual_source:s.visual_source||'ai', image_model:s.image_model||'openai/gpt-image-1', video_model:s.video_model||'google/veo-3.1-lite', posting_method:s.posting_method||'buffer', render_engine:s.render_engine||'ffmpeg', reference:s.reference||'', post_mode:s.post_mode||'now', post_time:s.post_time||'', winners:s.winners||'', brand_bible:s.brand_bible||'', pending:s.pending_action||null, history:(s.history||[]) }; const convo=(d.history||[]).slice(-20).map(h=>'U: '+h.u+' / A: '+h.a).join(' || ');\nconst sys=`You are a world-class Creative Director running a multi-platform content studio for one creator. You chat naturally, remember the recent conversation, keep everything ON-BRAND using the brand memory, and ALWAYS CONFIRM before creating. Supported platforms: instagram, youtube, tiktok, pinterest, facebook (use a comma list for multiple, e.g. \"instagram, pinterest\" — no more \"both\"). Platform content rules — enforce when the user requests or confirms content: pinterest: image or video only (no carousel); instagram: image, carousel, or video; tiktok: video only; youtube: video only; facebook: image, carousel, or video. If a requested content_type isn't supported on a requested platform, drop that platform and say so in the reply (or ask them to pick a supported type/platform if none of them work). video_route (video only, replaces the old visual_source+render_engine choice for video) is one of: ai (AI images animated via image-to-video model, edited with FFmpeg), pinterest (real Pinterest clips, edited with FFmpeg), hyperframes (HyperFrames renders the motion graphics itself, captions/audio baked in) — change via set_video_route. Image/carousel keep visual_source (ai|pinterest) via set_visual_source. Scheduling: to post later say e.g. 'post at 7pm' or 'schedule daily at 19:30' => set_post_mode=scheduled and set_post_time as 24h IST HH:MM; for immediate say 'post now' => set_post_mode=now. Recent conversation: ${convo||'(first message)'}.\\n\\nCurrent settings:\\n- niche: \\\"${d.niche||'(not set)'}\\\"\\n- style: \\\"${d.style||'(not set)'}\\\"\\n- platforms: ${d.platforms.join(', ')}\\n- content_type: ${d.content_type}\\n- visual_source (image/carousel): ${d.visual_source} (ai = AI-generated; pinterest = real Pinterest images)\\n- video_route (video only): ${d.video_route} (ai|pinterest|hyperframes)\\n- posts_per_platform: ${d.posts_per_platform} (how many pieces of content per platform per request)\\n- narration_voice: ${d.narration_voice} (OpenAI TTS voice, used for every video)\\n- auto_mode: ${d.auto_mode} (when true, script/image/Pinterest-clip approval steps are skipped automatically — only the final posting approval still happens)\\n- image_model: ${d.image_model}\\n- video_model: ${d.video_model}\\n- posting_method: ${d.posting_method} (buffer or api)\\n- reference (clip search phrase): \\\"${d.reference||'(none)'}\\\"\\n- post_mode: ${d.post_mode} (now = post right after approval; scheduled = queue until post_time)\\n- post_time: \\\"${d.post_time||'(not set)'}\\\" (IST 24h HH:MM, e.g. 19:30)\\n- BRAND BIBLE (keep new work consistent with this): \\\"${d.brand_bible||'(empty — first creation)'}\\\"\\n- pending action: ${d.pending?JSON.stringify(d.pending):'(none)'}\\n\\nTop-performing past posts (lean into these winning angles/styles when it fits the niche): ${d.winners||'(no analytics yet)'}.\\n\\nSaved reference images available by exact name: ${refs.map(r=>r.name).join(', ')||'(none yet — user can send a photo with a caption naming it to save one)'}. If the user asks to use one when creating content, set reference_name to that exact saved name.\\n\\nYou understand free-form requests. The user can set any of: niche, style, platforms (comma list, e.g. \"instagram,pinterest\"), content_type (image|carousel|video), visual_source for image/carousel (ai|pinterest), video_route for video (ai|pinterest|hyperframes), posts_per_platform (integer, default 2), narration_voice (an OpenAI TTS voice name), auto_mode (true/false — if they say things like 'do it all yourself', 'automate this', 'don't ask me at each step' set_auto_mode='true'; if they say 'ask me each time' / 'turn off auto mode' set_auto_mode='false'), image_model, video_model, posting_method (buffer|api), reference. They can also paste a SCRIPT to use, or ask you to decide as the specialist.\\n\\nRules:\\n- If they change any setting => intent=set_config and fill the matching set_* fields (only the ones mentioned).\\n- If they ask to CREATE => intent=propose. Fill action {content_type, platform, topic, script, slide_count, visual_source, posting_method}. Use current settings as defaults; if they didn't specify posting method, you MAY ask in the reply (e.g. 'post via Buffer or API?'). Write a short plan and ask them to reply 'yes'.\\n- Confirm (yes/go/make it) with a pending action => intent=confirm.\\n- cancel => intent=cancel. If they ask to see/show settings, reply (intent=chat) listing current niche, style, platform, visual_source, image_model and posting_method. If they're unsure what to make, suggest 2-3 on-brand ideas that fit the niche+style. Else intent=chat.\\n- If niche or style is missing when creating, ask them to set it first (intent=chat).\\nRespond STRICT JSON only.`;\nconst usr=`User: \\\"${intake.text}\\\"\\nReturn JSON: {\\n \\\"reply\\\":\\\"natural reply\\\",\\n \\\"intent\\\":\\\"set_config|propose|confirm|cancel|chat\\\",\\n \\\"set_niche\\\":\\\"\\\",\\\"set_style\\\":\\\"\\\",\\\"set_platforms\\\":\\\"\\\",\\\"set_content_type\\\":\\\"\\\",\\\"set_visual_source\\\":\\\"\\\",\\\"set_video_route\\\":\\\"\\\",\\\"set_posts_per_platform\\\":\\\"\\\",\\\"set_narration_voice\\\":\\\"\\\",\\\"set_auto_mode\\\":\\\"\\\",\\\"set_image_model\\\":\\\"\\\",\\\"set_video_model\\\":\\\"\\\",\\\"set_posting_method\\\":\\\"\\\",\\\"set_reference\\\":\\\"\\\",\\\"set_post_mode\\\":\\\"\\\",\\\"set_post_time\\\":\\\"\\\",\\n \\\"content_type\\\":\\\"\\\",\\\"platforms\\\":\\\"\\\",\\\"reference_name\\\":\\\"\\\",\\\"topic\\\":\\\"\\\",\\\"script\\\":\\\"\\\",\\\"slide_count\\\":5,\\\"visual_source\\\":\\\"\\\",\\\"video_route\\\":\\\"\\\",\\\"posting_method\\\":\\\"\\\"\\n}`;\nreturn [{ json:{ chatId:intake.chatId, d, refs, requestBody:{ model:($vars.OPENROUTER_LLM_MODEL||'openai/gpt-4o'), response_format:{type:'json_object'}, messages:[{role:'system',content:sys},{role:'user',content:usr}], temperature:0.5, max_tokens:900 } } }];"
       },
       "id": "cd-brain-build",
       "name": "🧠 Director Brain Prompt",
@@ -126,7 +126,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const _resp=$input.first().json;\nif(!_resp.choices||!_resp.choices[0]){ throw new Error('OpenRouter call failed or returned no choices: ' + JSON.stringify(_resp).slice(0,300)); }\nconst ctx=$('🧠 Director Brain Prompt').first().json;const d=ctx.d;const p=d.pending||{};\nlet o={};\ntry{ o=JSON.parse(_resp.choices[0].message.content); }\ncatch(e){ try{ const mm=((_resp.choices[0].message||{}).content||'').match(/\\{[\\s\\S]*\\}/); if(mm) o=JSON.parse(mm[0]); }catch(e2){ o={}; } }\nconst pick=(a,b,c)=>a||b||c||'';\nconst toArr=(v)=> v ? String(v).split(',').map(s=>s.trim().toLowerCase()).filter(Boolean) : null;\nconst platforms = toArr(o.set_platforms) || toArr(o.platforms) || (p.platforms&&p.platforms.length?p.platforms:null) || d.platforms;\nconst video_route = o.set_video_route || p.video_route || d.video_route || 'ai';\nconst posts_per_platform = Number(o.set_posts_per_platform || d.posts_per_platform || 2) || 2;\nconst narration_voice = o.set_narration_voice || d.narration_voice || 'onyx';\nconst reference_name = o.reference_name || p.reference_name || '';\nconst refMatch = ((ctx.refs)||[]).find(r=>r.name===reference_name);\nconst reference_image_url = refMatch ? refMatch.url : '';\nconst ROUTE_MAP = { ai:{visual_source:'ai_video',render_engine:'ffmpeg'}, pinterest:{visual_source:'pinterest',render_engine:'ffmpeg'}, hyperframes:{visual_source:'ai_video',render_engine:'hyperframes'} };\nconst content_type = pick(o.content_type, p.content_type, d.content_type);\nlet visual_source, render_engine;\nif(content_type==='video'){ const route=ROUTE_MAP[video_route]||ROUTE_MAP.ai; visual_source=route.visual_source; render_engine=route.render_engine; }\nelse { visual_source = pick(o.visual_source, p.visual_source, d.visual_source); render_engine = d.render_engine; }\nreturn [{ json:{\n  chatId:ctx.chatId, reply:o.reply||'On it!', intent:o.intent||'chat',\n  niche:d.niche, style:d.style, brand_bible:d.brand_bible,\n  set_niche:o.set_niche||'', set_style:o.set_style||'', set_platforms:o.set_platforms||'', set_content_type:o.set_content_type||'', set_visual_source:o.set_visual_source||'', set_image_model:o.set_image_model||'', set_video_model:o.set_video_model||'', set_posting_method:o.set_posting_method||'', set_reference:o.set_reference||'', set_video_route:o.set_video_route||'', render_engine, set_post_mode:o.set_post_mode||'', set_post_time:o.set_post_time||'', post_mode:d.post_mode, post_time:d.post_time,\n  platforms, video_route, posts_per_platform, narration_voice, reference_name, reference_image_url, set_posts_per_platform:o.set_posts_per_platform||'', set_narration_voice:o.set_narration_voice||'',\n  content_type,\n  visual_source,\n  posting_method: pick(o.posting_method, p.posting_method, d.posting_method),\n  image_model:d.image_model, video_model:d.video_model, reference:d.reference,\n  topic: pick(o.topic, p.topic, ''), script: pick(o.script, p.script, ''),\n  slide_count: Number(o.slide_count||p.slide_count||5), winners:d.winners\n} }];"
+        "jsCode": "const _resp=$input.first().json;\nif(!_resp.choices||!_resp.choices[0]){ throw new Error('OpenRouter call failed or returned no choices: ' + JSON.stringify(_resp).slice(0,300)); }\nconst ctx=$('🧠 Director Brain Prompt').first().json;const d=ctx.d;const p=d.pending||{};\nlet o={};\ntry{ o=JSON.parse(_resp.choices[0].message.content); }\ncatch(e){ try{ const mm=((_resp.choices[0].message||{}).content||'').match(/\\{[\\s\\S]*\\}/); if(mm) o=JSON.parse(mm[0]); }catch(e2){ o={}; } }\nconst pick=(a,b,c)=>a||b||c||'';\nconst toArr=(v)=> v ? String(v).split(',').map(s=>s.trim().toLowerCase()).filter(Boolean) : null;\nconst platforms = toArr(o.set_platforms) || toArr(o.platforms) || (p.platforms&&p.platforms.length?p.platforms:null) || d.platforms;\nconst video_route = o.set_video_route || p.video_route || d.video_route || 'ai';\nconst posts_per_platform = Number(o.set_posts_per_platform || d.posts_per_platform || 2) || 2;\nconst narration_voice = o.set_narration_voice || d.narration_voice || 'onyx';\nconst auto_mode = (o.set_auto_mode!==undefined && o.set_auto_mode!=='') ? (String(o.set_auto_mode).toLowerCase()==='true') : !!d.auto_mode;\nconst reference_name = o.reference_name || p.reference_name || '';\nconst refMatch = ((ctx.refs)||[]).find(r=>r.name===reference_name);\nconst reference_image_url = refMatch ? refMatch.url : '';\nconst ROUTE_MAP = { ai:{visual_source:'ai_video',render_engine:'ffmpeg'}, pinterest:{visual_source:'pinterest',render_engine:'ffmpeg'}, hyperframes:{visual_source:'ai_video',render_engine:'hyperframes'} };\nconst content_type = pick(o.content_type, p.content_type, d.content_type);\nlet visual_source, render_engine;\nif(content_type==='video'){ const route=ROUTE_MAP[video_route]||ROUTE_MAP.ai; visual_source=route.visual_source; render_engine=route.render_engine; }\nelse { visual_source = pick(o.visual_source, p.visual_source, d.visual_source); render_engine = d.render_engine; }\nreturn [{ json:{\n  chatId:ctx.chatId, reply:o.reply||'On it!', intent:o.intent||'chat',\n  niche:d.niche, style:d.style, brand_bible:d.brand_bible,\n  set_niche:o.set_niche||'', set_style:o.set_style||'', set_platforms:o.set_platforms||'', set_content_type:o.set_content_type||'', set_visual_source:o.set_visual_source||'', set_image_model:o.set_image_model||'', set_video_model:o.set_video_model||'', set_posting_method:o.set_posting_method||'', set_reference:o.set_reference||'', set_video_route:o.set_video_route||'', render_engine, set_post_mode:o.set_post_mode||'', set_post_time:o.set_post_time||'', post_mode:d.post_mode, post_time:d.post_time,\n  platforms, video_route, posts_per_platform, narration_voice, reference_name, reference_image_url, auto_mode, set_auto_mode:o.set_auto_mode||'', set_posts_per_platform:o.set_posts_per_platform||'', set_narration_voice:o.set_narration_voice||'',\n  content_type,\n  visual_source,\n  posting_method: pick(o.posting_method, p.posting_method, d.posting_method),\n  image_model:d.image_model, video_model:d.video_model, reference:d.reference,\n  topic: pick(o.topic, p.topic, ''), script: pick(o.script, p.script, ''),\n  slide_count: Number(o.slide_count||p.slide_count||5), winners:d.winners\n} }];"
       },
       "id": "cd-brain-parse",
       "name": "📋 Parse Director",
@@ -272,7 +272,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ chat_id:$json.chatId, niche:($json.set_niche||$json.niche||''), style:($json.set_style||$json.style||''), platforms:($json.platforms||['instagram']), content_type:($json.set_content_type||$json.content_type||'video'), visual_source:($json.set_visual_source||$json.visual_source||'ai'), video_route:($json.video_route||'ai'), posts_per_platform:($json.set_posts_per_platform||$json.posts_per_platform||2), narration_voice:($json.set_narration_voice||$json.narration_voice||'onyx'), image_model:($json.set_image_model||$json.image_model||'openai/gpt-image-1'), video_model:($json.set_video_model||$json.video_model||'google/veo-3.1-lite'), posting_method:($json.set_posting_method||$json.posting_method||'buffer'), reference:($json.set_reference||$json.reference||''), render_engine:($json.render_engine||'ffmpeg'), post_mode:($json.set_post_mode||$json.post_mode||'now'), post_time:($json.set_post_time||$json.post_time||''), brand_bible:($json.set_style?'':$json.brand_bible), updated_at:$now.toISO() }) }}",
+        "body": "={{ JSON.stringify({ chat_id:$json.chatId, niche:($json.set_niche||$json.niche||''), style:($json.set_style||$json.style||''), platforms:($json.platforms||['instagram']), content_type:($json.set_content_type||$json.content_type||'video'), visual_source:($json.set_visual_source||$json.visual_source||'ai'), video_route:($json.video_route||'ai'), posts_per_platform:($json.set_posts_per_platform||$json.posts_per_platform||2), narration_voice:($json.set_narration_voice||$json.narration_voice||'onyx'), auto_mode:!!$json.auto_mode, image_model:($json.set_image_model||$json.image_model||'openai/gpt-image-1'), video_model:($json.set_video_model||$json.video_model||'google/veo-3.1-lite'), posting_method:($json.set_posting_method||$json.posting_method||'buffer'), reference:($json.set_reference||$json.reference||''), render_engine:($json.render_engine||'ffmpeg'), post_mode:($json.set_post_mode||$json.post_mode||'now'), post_time:($json.set_post_time||$json.post_time||''), brand_bible:($json.set_style?'':$json.brand_bible), updated_at:$now.toISO() }) }}",
         "options": {
           "response": {
             "response": {
@@ -3984,6 +3984,99 @@
         5880,
         1260
       ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "am",
+              "leftValue": "={{ $('📋 Parse Director').first().json.auto_mode }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "cd-auto-if-script",
+      "name": "❓ Auto Mode? (Script)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "am",
+              "leftValue": "={{ $('📋 Parse Director').first().json.auto_mode }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "cd-auto-if-aiimg",
+      "name": "❓ Auto Mode? (AI Images)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "am",
+              "leftValue": "={{ $('📋 Parse Director').first().json.auto_mode }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "cd-auto-if-pinclip",
+      "name": "❓ Auto Mode? (Pinterest Clips)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3140,
+        1360
+      ]
     }
   ],
   "connections": {
@@ -4178,7 +4271,7 @@
       "main": [
         [
           {
-            "node": "📝 Approve: Script",
+            "node": "❓ Auto Mode? (Script)",
             "type": "main",
             "index": 0
           }
@@ -4574,7 +4667,7 @@
       "main": [
         [
           {
-            "node": "🎨 Approve: AI Images",
+            "node": "❓ Auto Mode? (AI Images)",
             "type": "main",
             "index": 0
           }
@@ -4903,7 +4996,7 @@
       "main": [
         [
           {
-            "node": "📌 Approve: Pinterest Clips",
+            "node": "❓ Auto Mode? (Pinterest Clips)",
             "type": "main",
             "index": 0
           }
@@ -5720,6 +5813,60 @@
         [
           {
             "node": "🕒 Post Timing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Auto Mode? (Script)": {
+      "main": [
+        [
+          {
+            "node": "🔀 Content Type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📝 Approve: Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Auto Mode? (AI Images)": {
+      "main": [
+        [
+          {
+            "node": "📤 Explode AI Images",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🎨 Approve: AI Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Auto Mode? (Pinterest Clips)": {
+      "main": [
+        [
+          {
+            "node": "📤 Explode Clips",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📌 Approve: Pinterest Clips",
             "type": "main",
             "index": 0
           }

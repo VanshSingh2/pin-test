@@ -126,3 +126,7 @@ create table if not exists cd_references (
   created_at timestamptz default now()
 );
 alter table cd_references disable row level security;
+
+-- auto_mode: when true, skips the script/image/Pinterest-clip approval gates (only the final
+-- posting approval still fires). Chat-settable ("automate this" / "ask me each time").
+alter table cd_state add column if not exists auto_mode boolean default false;
