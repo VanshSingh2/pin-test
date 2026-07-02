@@ -136,3 +136,7 @@ alter table cd_state add column if not exists auto_mode boolean default false;
 -- every script/caption/image-prompt generation step automatically. Say "clear my preferences"
 -- to reset it.
 alter table cd_state add column if not exists custom_preferences text default '';
+
+-- Video caption/subtitle styling — chat-settable ("make captions yellow and bigger").
+alter table cd_state add column if not exists subtitle_color text default 'white';
+alter table cd_state add column if not exists subtitle_size int default 64;
