@@ -116,3 +116,13 @@ alter table cd_memory add column if not exists posted boolean default true;
 alter table cd_state add column if not exists posts_per_platform int default 2;
 -- narration_voice: chat-settable, remembered OpenAI TTS voice used for every video (both ffmpeg and hyperframes engines)
 alter table cd_state add column if not exists narration_voice text default 'onyx';
+
+-- Named reference images: send a photo to the bot with a caption = the name to save it here.
+create table if not exists cd_references (
+  id         bigint generated always as identity primary key,
+  chat_id    text,
+  name       text,
+  url        text,
+  created_at timestamptz default now()
+);
+alter table cd_references disable row level security;
