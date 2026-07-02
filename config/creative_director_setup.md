@@ -61,12 +61,17 @@ or simply: `make a 6-slide carousel on cold brew myths` · `post an image about 
 2. n8n Variables (mostly shared with the other workflows):
    `OPENROUTER_API_KEY`, `OPENROUTER_LLM_MODEL`, `OPENAI_API_KEY` (TTS), `IMGBB_API_KEY`, `PEXELS_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `BUFFER_ACCESS_TOKEN`, `BUFFER_PROFILE_ID_INSTAGRAM/YOUTUBE/TIKTOK/PINTEREST`, `PINTEREST_ACCESS_TOKEN`, `PINTEREST_BOARD_ID_LIFESTYLE`, `TELEGRAM_CHAT_ID`, `FFMPEG_FONT`, `OPENAI_TTS_VOICE`.
 3. Credentials: **Telegram Bot** (`TG_CRED_ID`), **YouTube OAuth2** (`YT_CRED_ID`).
+4. Import `workflows/creative_director_error_handler.json`, activate it, then set `creative_director_v1.json`'s `settings.errorWorkflow` to its workflow ID (n8n shows the ID in the URL after import) so any hard failure gets a Telegram alert.
 
 ---
 
 ## Defaults you can change by chatting
 
-`platform` (instagram·youtube·tiktok·pinterest·facebook·both) · `content_type` (image·carousel·video) · `visual_source` (ai·ai_video·pexels·pinterest) · `image_model` (default `openai/gpt-image-1`) · `video_model` · `render_engine` (ffmpeg·hyperframes) · `posting_method` (buffer·api) · `post_mode` (now·scheduled) · `post_time` (IST HH:MM) · `style` · `niche` · `reference`.
+`platforms` (comma list of instagram·youtube·tiktok·pinterest·facebook — "both" is gone, just name the platforms) · `content_type` (image·carousel·video — validated against each platform's supported types; pinterest has no carousel, tiktok/youtube are video-only) · `visual_source` for image/carousel (ai·pinterest) · `video_route` for video (ai·pinterest·hyperframes — replaces the old visual_source+render_engine combo) · `image_model` (default `openai/gpt-image-1`) · `video_model` · `posting_method` (buffer·api — API posting only works natively for youtube/pinterest; any other platform requested via API automatically falls back to Buffer with a heads-up message) · `post_mode` (now·scheduled) · `post_time` (IST HH:MM) · `style` · `niche` · `reference`.
+
+**API posting caveat:** Instagram/TikTok have no usable native posting API here (Instagram needs a Graph API container→publish flow with a business token; TikTok needs app review). Requesting `posting_method=api` for those platforms posts via Buffer instead and tells you so — it no longer silently misroutes.
+
+**Failed posts:** if generation succeeds but the actual publish call fails (bad token, rate limit, etc.), you get a "⚠️ posting FAILED" message instead of a false "✅ posted!" — check credentials and retry manually.
 
 ---
 

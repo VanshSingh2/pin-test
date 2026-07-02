@@ -95,3 +95,19 @@ alter table cd_memory add column if not exists score numeric default 0;    -- we
 alter table cd_memory add column if not exists metrics_updated_at timestamptz;
 
 alter table cd_state  add column if not exists winners text default '';     -- short summary of top-performing topics/styles
+
+
+-- ------------------------------------------------------------
+-- Added later: multi-platform posting + video_route (Platform Rules upgrade)
+-- ------------------------------------------------------------
+-- platforms replaces the old single `platform` column (kept, unused going forward, for backward compat with old rows).
+alter table cd_state add column if not exists platforms jsonb default '["instagram"]'::jsonb;
+-- video_route replaces the visual_source+render_engine choice for content_type=video only
+-- (ai | pinterest | hyperframes). visual_source/render_engine columns are kept and still populated
+-- (derived from video_route) for backward compat with anything reading them directly.
+alter table cd_state add column if not exists video_route text default 'ai';
+
+-- cd_memory gains the same platforms array; old `platform` (text, first platform) is kept populated too.
+alter table cd_memory add column if not exists platforms jsonb;
+-- posted: false when generation succeeded but the publish step (Buffer/YouTube/Pinterest) failed.
+alter table cd_memory add column if not exists posted boolean default true;

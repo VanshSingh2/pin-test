@@ -1,0 +1,27 @@
+{
+  "name": "🚨 Creative Director — Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "ceh-trigger", "name": "🚨 Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger", "typeVersion": 1, "position": [-260, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $vars.TELEGRAM_CHAT_ID }}",
+        "text": "=🚨 *Creative Director workflow failed*\n📄 Workflow: {{ $json.workflow && $json.workflow.name }}\n🔌 Node: {{ $json.execution && $json.execution.lastNodeExecuted }}\n❗ {{ $json.execution && $json.execution.error && $json.execution.error.message }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "ceh-notify", "name": "💬 Telegram: Workflow Failed",
+      "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [-40, 300],
+      "credentials": { "telegramApi": { "id": "TG_CRED_ID", "name": "Telegram Bot" } }
+    }
+  ],
+  "connections": {
+    "🚨 Error Trigger": { "main": [[{ "node": "💬 Telegram: Workflow Failed", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "id": "wf-creative-director-error-handler",
+  "tags": [{ "id": "social-ai", "name": "Social AI" }]
+}
