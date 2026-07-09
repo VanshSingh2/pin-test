@@ -25,7 +25,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const msg=$input.first().json.message||{};\nconst photo=Array.isArray(msg.photo)?msg.photo[msg.photo.length-1]:null;\nconst text=(msg.text||'').trim();\nconst ytMatch=text.match(/https?:\\/\\/(?:www\\.)?(?:m\\.)?(?:youtube\\.com\\/(?:watch\\?v=|shorts\\/|live\\/|embed\\/)[\\w-]+|youtu\\.be\\/[\\w-]+)[^\\s]*/i);\nconst ytUrl=ytMatch?ytMatch[0]:'';\nconst cm=text.match(/(\\d{1,2})\\s*clips?/i);\nconst clipCount=cm?Math.min(Math.max(parseInt(cm[1],10),1),8):3;\nreturn [{ json:{ chatId:String((msg.chat&&msg.chat.id)||''), text, hasPhoto: !!photo, photoFileId: photo?photo.file_id:'', caption:(msg.caption||'').trim(), ytUrl, clipCount } }];"
+        "jsCode": "const msg=$input.first().json.message||{};\nconst photo=Array.isArray(msg.photo)?msg.photo[msg.photo.length-1]:null;\nconst text=(msg.text||'').trim();\nconst idm=text.match(/(?:youtube\\.com\\/(?:watch\\?(?:[^\\s]*&)?v=|shorts\\/|live\\/|embed\\/)|youtu\\.be\\/)([\\w-]{11})/i);\nconst ytId=idm?idm[1]:'';\nconst cm=text.match(/(\\d{1,2})\\s*clips?/i);\nconst clipCount=cm?Math.min(Math.max(parseInt(cm[1],10),1),8):3;\n// only treat as a clip request if the message is basically just the link,\n// or explicitly asks to clip/short it — otherwise let the Director handle it\nconst stripped=text.replace(/https?:\\/\\/\\S+/g,'').replace(/(\\d{1,2})\\s*clips?/ig,'').trim();\nconst wantsClip=!!ytId && (stripped.length<=4 || /\\b(clip|clips|short|shorts|reel|reels)\\b/i.test(text));\nconst ytUrl=(ytId&&wantsClip)?('https://www.youtube.com/watch?v='+ytId):'';\nreturn [{ json:{ chatId:String((msg.chat&&msg.chat.id)||''), text, hasPhoto: !!photo, photoFileId: photo?photo.file_id:'', caption:(msg.caption||'').trim(), ytUrl, clipCount } }];"
       },
       "id": "cd-intake",
       "name": "🧠 Intake",
@@ -1146,7 +1146,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const base=$('🎬 Video: Split Scenes').item.json;\nconst r=$json;let url='';\ntry{ const v=r.videos||[]; if(v.length){ const f=v[0].video_files||[]; const port=f.filter(x=>x.height>=x.width); const pool=port.length?port:f; pool.sort((a,b)=>(b.height||0)-(a.height||0)); url=(pool[0]||{}).link||''; } }catch(e){}\nreturn [{ json:{ idx:base.idx, narration:base.narration, on_screen_text:base.on_screen_text, image_url:'', clip_url:url } }];"
+        "jsCode": "const base=$('🎬 Video: Split Scenes').item.json;\nconst r=$json;let url='';\ntry{ const v=r.videos||[]; if(v.length){ const f=v[0].video_files||[]; const port=f.filter(x=>x.height>=x.width); const pool=port.length?port:f; pool.sort((a,b)=>(b.height||0)-(a.height||0)); url=(pool[0]||{}).link||''; } }catch(e){}\nif(!url){ return [{ json:{ chatId:base.chatId, job:base.job, idx:base.idx, __scrape_failed:true, __scrape_error:'No Pexels stock clip found for scene '+((base.idx||0)+1)+' — try a different topic/b-roll keyword or switch the video route.' } }]; }\nreturn [{ json:{ idx:base.idx, chatId:base.chatId, job:base.job, narration:base.narration, on_screen_text:base.on_screen_text, image_url:'', clip_url:url } }];"
       },
       "id": "cd-vid-pexdone",
       "name": "📋 Scene: Pexels Ready",
@@ -3386,7 +3386,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const lr=$json; const rows=Array.isArray(lr)?lr:(lr.data||[]); return rows.map(r=>({ json:{ ...((r.payload)||{}), __sched_id:r.id, post_mode:'now' } }));"
+        "jsCode": "const lr=$('📥 Fetch Due Posts').first().json; const rows=Array.isArray(lr)?lr:(lr.data||[]); return rows.map(r=>({ json:{ ...((r.payload)||{}), __sched_id:r.id, post_mode:'now' } }));"
       },
       "id": "cd-sched-explode",
       "name": "📤 Explode Due",
@@ -4828,7 +4828,8 @@
       "position": [
         80,
         2360
-      ]
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -4845,7 +4846,8 @@
       "position": [
         300,
         2360
-      ]
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -4887,12 +4889,7 @@
           ]
         },
         "options": {
-          "timeout": 300000,
-          "response": {
-            "response": {
-              "neverError": true
-            }
-          }
+          "timeout": 300000
         }
       },
       "id": "cd-clip-transcribe",
@@ -4902,7 +4899,8 @@
       "position": [
         520,
         2360
-      ]
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -4915,7 +4913,8 @@
       "position": [
         740,
         2360
-      ]
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -4939,12 +4938,7 @@
         "rawContentType": "application/json",
         "body": "={{ JSON.stringify($json.requestBody) }}",
         "options": {
-          "timeout": 120000,
-          "response": {
-            "response": {
-              "neverError": true
-            }
-          }
+          "timeout": 120000
         }
       },
       "id": "cd-clip-ranker",
@@ -4954,11 +4948,12 @@
       "position": [
         960,
         2360
-      ]
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
-        "jsCode": "const r=$input.first().json;\nif(!r.choices||!r.choices[0]){ throw new Error('Clip ranker (OpenRouter) failed or returned no choices: '+JSON.stringify(r).slice(0,250)); }\nlet o={};\ntry{ o=JSON.parse(r.choices[0].message.content); }\ncatch(e){ try{ const mm=(r.choices[0].message.content||'').match(/\\{[\\s\\S]*\\}/); if(mm) o=JSON.parse(mm[0]); }catch(e2){ o={}; } }\nconst segs=(function(){ try{ return $('🎙️ Clip: Transcribe').first().json.segments||[]; }catch(e){ return []; } })();\nconst dur=(function(){ try{ return $('🎙️ Clip: Transcribe').first().json.duration||0; }catch(e){ return 0; } })();\nlet moments=Array.isArray(o.moments)?o.moments:[];\nmoments=moments.map(m=>{\n  let start=Math.max(0,Number(m.start)||0);\n  let end=Number(m.end)||start+30;\n  if(dur){ end=Math.min(end,dur); }\n  let d=end-start;\n  if(d<10){ end=start+Math.min(30,((dur||start+30)-start)); d=end-start; }\n  if(d>90){ end=start+90; d=90; }\n  const subs=segs.filter(s=>s.end>start&&s.start<end).map(s=>({ start:Math.max(0,s.start-start), end:Math.max(0.2,Math.min(end,s.end)-start), text:String(s.text).trim() }));\n  return { start:Math.round(start*100)/100, dur:Math.round(d*100)/100, end, title:String(m.title||'Clip').slice(0,80), caption:String(m.caption||'').slice(0,300), reason:String(m.reason||''), score:Math.round(Number(m.score)||0), subs };\n}).filter(m=>m.dur>=8);\nif(!moments.length){ const end=Math.min(dur||30,45); moments=[{ start:0, dur:end, end, title:'Highlight', caption:'', reason:'fallback (no moments returned)', score:0, subs:segs.filter(s=>s.start<end).map(s=>({start:s.start,end:Math.min(end,s.end),text:String(s.text).trim()})) }]; }\nmoments.sort((a,b)=>b.score-a.score);\nreturn [{ json:{ chatId:$('🧩 Clip: Prep').first().json.chatId, moments } }];"
+        "jsCode": "const r=$input.first().json;\nif(!r.choices||!r.choices[0]){ throw new Error('Clip ranker (OpenRouter) failed or returned no choices: '+JSON.stringify(r).slice(0,250)); }\nlet o={};\ntry{ o=JSON.parse(r.choices[0].message.content); }\ncatch(e){ try{ const mm=(r.choices[0].message.content||'').match(/\\{[\\s\\S]*\\}/); if(mm) o=JSON.parse(mm[0]); }catch(e2){ o={}; } }\nconst segs=(function(){ try{ return $('🎙️ Clip: Transcribe').first().json.segments||[]; }catch(e){ return []; } })();\nconst dur=(function(){ try{ return $('🎙️ Clip: Transcribe').first().json.duration||0; }catch(e){ return 0; } })();\nconst toSec=(v)=>{ if(typeof v==='number') return isFinite(v)?v:0; const s=String(v||'').trim(); if(/^\\d+(\\.\\d+)?$/.test(s)) return parseFloat(s); const m=s.match(/^(\\d+):(\\d{1,2})(?::(\\d{1,2}))?$/); if(m){ return m[3]?(+m[1]*3600 + +m[2]*60 + +m[3]):(+m[1]*60 + +m[2]); } const f=parseFloat(s); return isFinite(f)?f:0; };\nlet moments=Array.isArray(o.moments)?o.moments:[];\nmoments=moments.map(m=>{\n  let start=Math.max(0,toSec(m.start));\n  let end=toSec(m.end)||start+30;\n  if(dur){ end=Math.min(end,dur); }\n  let d=end-start;\n  if(d<10){ end=start+Math.min(30,((dur||start+30)-start)); d=end-start; }\n  if(d>90){ end=start+90; d=90; }\n  const subs=segs.filter(s=>s.end>start&&s.start<end).map(s=>({ start:Math.max(0,s.start-start), end:Math.max(0.2,Math.min(end,s.end)-start), text:String(s.text).trim() }));\n  return { start:Math.round(start*100)/100, dur:Math.round(d*100)/100, end, title:String(m.title||'Clip').slice(0,80), caption:String(m.caption||'').slice(0,300), reason:String(m.reason||''), score:Math.round(Number(m.score)||0), subs };\n}).filter(m=>m.dur>=10);\n// enforce non-overlapping (defensive — model is asked for this but may disobey)\nmoments.sort((a,b)=>a.start-b.start);\nconst dedup=[]; let lastEnd=-1;\nfor(const m of moments){ if(m.start>=lastEnd-0.5){ dedup.push(m); lastEnd=m.end; } }\nmoments=dedup;\nif(!moments.length){ const end=Math.min(dur||30,45); moments=[{ start:0, dur:end, end, title:'Highlight', caption:'', reason:'fallback (no valid moments returned)', score:0, subs:segs.filter(s=>s.start<end).map(s=>({start:s.start,end:Math.min(end,s.end),text:String(s.text).trim()})) }]; }\nmoments.sort((a,b)=>b.score-a.score);\nreturn [{ json:{ chatId:$('🧩 Clip: Prep').first().json.chatId, moments } }];"
       },
       "id": "cd-clip-parse",
       "name": "📋 Clip: Parse Moments",
@@ -4967,11 +4962,12 @@
       "position": [
         1180,
         2360
-      ]
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
-        "jsCode": "const p=$('🧩 Clip: Prep').first().json;\nconst parsed=$input.first().json;\nconst dir=p.dir; const clips=parsed.moments||[];\nconst SUBCOLOR='&H00FFFFFF&';\nconst b64=(s)=>Buffer.from(String(s||''),'utf8').toString('base64');\nconst fmt=(t)=>{ t=Math.max(0,t); const h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=Math.floor(t%60),ms=Math.round((t-Math.floor(t))*1000); const p2=(n)=>String(n).padStart(2,'0'); return p2(h)+':'+p2(m)+':'+p2(s)+','+String(ms).padStart(3,'0'); };\nconst L=['set -e','export DIR='+dir,'cd $DIR'];\nconst out=[];\nclips.forEach((c,i)=>{\n  let srt='';\n  (c.subs||[]).forEach((s,j)=>{ if(!s.text) return; srt+=(j+1)+'\\n'+fmt(s.start)+' --> '+fmt(s.end)+'\\n'+s.text+'\\n\\n'; });\n  if(!srt) srt='1\\n00:00:00,000 --> 00:00:03,000\\n'+(c.title||'')+'\\n';\n  L.push('echo \"'+b64(srt)+'\" | base64 -d > cap_'+i+'.srt');\n  const vf=\"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles=cap_\"+i+\".srt:force_style='FontName=DejaVu Sans,Fontsize=15,Bold=1,PrimaryColour=\"+SUBCOLOR+\",BorderStyle=3,Outline=2,Shadow=0,Alignment=2,MarginV=150'\";\n  L.push('ffmpeg -y -ss '+c.start+' -i source.mp4 -t '+c.dur+' -vf \"'+vf+'\" -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -movflags +faststart clip_'+i+'.mp4');\n  out.push({ chatId:p.chatId, clipPath:dir+'/clip_'+i+'.mp4', index:i+1, total:clips.length, title:c.title, score:c.score, captionText:'🎬 Clip '+(i+1)+'/'+clips.length+' — '+(c.title||'')+'\\n⭐ Virality '+(c.score||0)+'/100 · '+c.dur+'s\\n\\n'+(c.caption||'') });\n});\nL.push('echo DONE');\nreturn [{ json:{ chatId:p.chatId, job:p.job, dir, clips:out, ffmpegScript:L.join('\\n') } }];"
+        "jsCode": "const p=$('🧩 Clip: Prep').first().json;\nconst parsed=$input.first().json;\nconst dir=p.dir; const clips=parsed.moments||[];\nconst SUBCOLOR='&H00FFFFFF&';\nconst b64=(s)=>Buffer.from(String(s||''),'utf8').toString('base64');\nconst fmt=(t)=>{ t=Math.max(0,t); const h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=Math.floor(t%60),ms=Math.round((t-Math.floor(t))*1000); const p2=(n)=>String(n).padStart(2,'0'); return p2(h)+':'+p2(m)+':'+p2(s)+','+String(ms).padStart(3,'0'); };\nconst L=['set -e','export DIR='+dir,'cd $DIR'];\nconst out=[];\nclips.forEach((c,i)=>{\n  let srt='';\n  (c.subs||[]).forEach((s,j)=>{ if(!s.text) return; srt+=(j+1)+'\\n'+fmt(s.start)+' --> '+fmt(s.end)+'\\n'+s.text+'\\n\\n'; });\n  if(!srt) srt='1\\n00:00:00,000 --> 00:00:03,000\\n'+(c.title||'')+'\\n';\n  L.push('echo \"'+b64(srt)+'\" | base64 -d > cap_'+i+'.srt');\n  const vf=\"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,subtitles=cap_\"+i+\".srt:force_style='FontName=DejaVu Sans,Fontsize=15,Bold=1,PrimaryColour=\"+SUBCOLOR+\",BorderStyle=3,Outline=2,Shadow=0,Alignment=2,MarginV=150'\";\n  L.push('ffmpeg -y -ss '+c.start+' -i source.mp4 -t '+c.dur+' -vf \"'+vf+'\" -c:v libx264 -preset veryfast -pix_fmt yuv420p -b:v 3500k -maxrate 4000k -bufsize 8000k -c:a aac -movflags +faststart clip_'+i+'.mp4');\n  out.push({ chatId:p.chatId, clipPath:dir+'/clip_'+i+'.mp4', index:i+1, total:clips.length, title:c.title, score:c.score, captionText:'🎬 Clip '+(i+1)+'/'+clips.length+' — '+(c.title||'')+'\\n⭐ Virality '+(c.score||0)+'/100 · '+c.dur+'s\\n\\n'+(c.caption||'') });\n});\nL.push('echo DONE');\nreturn [{ json:{ chatId:p.chatId, job:p.job, dir, clips:out, ffmpegScript:L.join('\\n') } }];"
       },
       "id": "cd-clip-buildff",
       "name": "🎞️ Clip: Build FFmpeg",
@@ -4980,7 +4976,8 @@
       "position": [
         1400,
         2360
-      ]
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -4993,7 +4990,8 @@
       "position": [
         1620,
         2360
-      ]
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -5023,7 +5021,8 @@
       "position": [
         2060,
         2360
-      ]
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -5048,7 +5047,8 @@
           "id": "TG_CRED_ID",
           "name": "Telegram Bot"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -5072,6 +5072,104 @@
           "name": "Telegram Bot"
         }
       }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('🧠 Intake').first().json.chatId }}",
+        "text": "=⚠️ Sorry, I couldn't finish clipping that video: {{ ($json.error && $json.error.message) || $json.error || 'something went wrong' }}. Try a shorter, public (non-live) video, or send the link again.",
+        "additionalFields": {}
+      },
+      "id": "cd-clip-failed",
+      "name": "💬 Clip: Failed",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        2560
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "TG_CRED_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "pxok",
+              "leftValue": "={{ $json.__scrape_failed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEqual"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "cd-pexels-ok",
+      "name": "❓ Pexels Scene OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2760,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $vars.SUPABASE_URL }}/rest/v1/cd_scheduled?status=eq.pending&due_at=lte.{{ $now.toISO() }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ status:'posting' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "cd-claim-due",
+      "name": "🔒 Claim Due Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -260,
+        1760
+      ]
     }
   ],
   "connections": {
@@ -5947,7 +6045,7 @@
       "main": [
         [
           {
-            "node": "🎞️ Video: Build FFmpeg",
+            "node": "❓ Pexels Scene OK?",
             "type": "main",
             "index": 0
           }
@@ -6411,7 +6509,7 @@
       "main": [
         [
           {
-            "node": "📤 Explode Due",
+            "node": "🔒 Claim Due Posts",
             "type": "main",
             "index": 0
           }
@@ -7186,6 +7284,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "💬 Clip: Failed",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -7194,6 +7299,13 @@
         [
           {
             "node": "🎙️ Clip: Transcribe",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "💬 Clip: Failed",
             "type": "main",
             "index": 0
           }
@@ -7208,6 +7320,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "💬 Clip: Failed",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -7216,6 +7335,13 @@
         [
           {
             "node": "🤖 OpenRouter: Clip Ranker",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "💬 Clip: Failed",
             "type": "main",
             "index": 0
           }
@@ -7230,6 +7356,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "💬 Clip: Failed",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -7238,6 +7371,13 @@
         [
           {
             "node": "🎞️ Clip: Build FFmpeg",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "💬 Clip: Failed",
             "type": "main",
             "index": 0
           }
@@ -7252,6 +7392,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "💬 Clip: Failed",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -7260,6 +7407,13 @@
         [
           {
             "node": "📤 Clip: Explode",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "💬 Clip: Failed",
             "type": "main",
             "index": 0
           }
@@ -7282,6 +7436,65 @@
         [
           {
             "node": "💬 Clip: Send",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "💬 Clip: Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💬 Clip: Send": {
+      "main": [
+        [],
+        [
+          {
+            "node": "💬 Clip: Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Pexels Scene OK?": {
+      "main": [
+        [
+          {
+            "node": "🎞️ Video: Build FFmpeg",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "💬 Telegram: Scrape Failed (Scene)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🚫 Clips Cancelled": {
+      "main": [
+        [
+          {
+            "node": "💾 Clear Active Job Token (Done)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔒 Claim Due Posts": {
+      "main": [
+        [
+          {
+            "node": "📤 Explode Due",
             "type": "main",
             "index": 0
           }

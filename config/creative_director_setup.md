@@ -192,3 +192,26 @@ clip this into 5: https://youtu.be/XXX  → 5 clips (max 8)
 - **`🔀 API Route`** fallback fixed (was an invalid `fallbackOutput` value) → routes unexpected values to the "API not supported" reply.
 
 > Still requires your attention after import: set `settings.errorWorkflow` to the imported error-handler's id (n8n can't know the id until you import it), and verify your Buffer GraphQL endpoint/token against Buffer's current API.
+
+
+
+---
+
+## 🔍 Code-review fixes (round 2)
+
+A deep review (bugs / breakage / connection errors, plus per-case testing) confirmed the three core requirements — **no auto-post** (the `🧑‍⚖️ Approve: Post` gate is a mandatory cut-vertex for every posting path; `auto_mode` never bypasses it), **review required**, and **platform selection before posting** (`🛡️ Validate Platform+Type` runs before the posting-method/API routing) — all **PASS**. The following confirmed bugs were fixed:
+
+1. **Shell-injection via the YouTube link (BLOCKER):** `🧠 Intake` now extracts the 11-char video id and rebuilds a canonical `https://www.youtube.com/watch?v=<id>` before it ever reaches the `yt-dlp` shell command, so a crafted URL can no longer execute host commands.
+2. **Silent clip failures (BLOCKER):** the clip pipeline had no error feedback — any failure after the "downloading…" ack left the user in silence. All failure-prone clip nodes now use `onError: continueErrorOutput` wired to a new **`💬 Clip: Failed`** Telegram node (and `neverError` was removed from the transcription/ranker calls so real 4xx/5xx surface).
+3. **Scheduled double-post (BLOCKER):** `📥 Fetch Due Posts → 📤 Explode Due` fanned out N posts but only one row was marked done, so the rest re-posted every 15-min cycle. A new **`🔒 Claim Due Posts`** node atomically flips all due rows to `posting` before publishing, so no row is fetched twice.
+4. **Pexels scene silently blank (MAJOR):** the new Pexels video route had no empty-result guard (unlike Pinterest). `📋 Scene: Pexels Ready` now flags `__scrape_failed` and routes through **`❓ Pexels Scene OK?`** → notifies the user instead of rendering a blank placeholder.
+5. **YouTube link hijack (MINOR):** a link inside a normal request (e.g. "make a post about <link>") no longer diverts to clipping — clip mode triggers only when the message is essentially just the link or says clip/short/reel.
+6. **Telegram 50 MB upload (MAJOR):** `🎞️ Clip: Build FFmpeg` now caps clip bitrate (`-b:v 3500k -maxrate 4000k -bufsize 8000k`) so rendered Shorts stay under Telegram's bot upload limit.
+7. **Clip-rejection token leak (MEDIUM):** rejecting Pinterest clips (`🚫 Clips Cancelled`) now clears the active-job token instead of dead-ending.
+8. **Moment robustness (MINOR):** `📋 Clip: Parse Moments` now parses `mm:ss` timestamps, de-overlaps moments, and enforces the 10 s minimum.
+
+### Still recommended (external / unverified — left unchanged to avoid breaking a working setup)
+- **Buffer GraphQL:** verify the `createPost` mutation shape and success parsing against Buffer's current schema (reviewers flagged it may need a `... on PostActionSuccess { post { id } }` selection), and the analytics call uses a legacy Buffer endpoint that appears deprecated.
+- **`ai_video` route:** the OpenRouter image→video submit/poll endpoints must point at a real generative-video provider.
+- **`settings.errorWorkflow`:** set it to the imported error-handler id (n8n assigns the id on import) so hard failures elsewhere also notify.
+- **Approval gates:** consider adding `limitWaitTime` so ignored approvals don't wait forever.
