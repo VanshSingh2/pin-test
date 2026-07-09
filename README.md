@@ -1,427 +1,109 @@
-# 🤖 Social Media AI Automation — n8n Workflows
+# 🎯 Creative Director — Unified Conversational Content Studio (n8n)
 
-This repo contains **two** all-in-one n8n automation workflows, both backed by **Supabase**:
+One conversational **Telegram bot** that runs an entire multi-platform content studio, backed by **Supabase**. You chat with it; it understands, **confirms**, then creates and posts **images, carousels, or videos/reels** to **Instagram, YouTube, TikTok, Pinterest, or Facebook** — staying **on-brand** because it remembers everything it has made.
 
-> 🎯 **NEW — `workflows/creative_director_v1.json`:** one conversational Telegram bot for **all platforms** (Instagram, YouTube, TikTok, Pinterest). Chat to set niche + style + visual source (AI / Pexels / Pinterest clips) + AI model + posting (Buffer/API); it generates a **master creative brief**, remembers your **brand bible** so everything stays consistent, and makes **images, carousels, or videos** on confirmation. See [`config/creative_director_setup.md`](config/creative_director_setup.md).
+> **NEW ⭐ — YouTube → Shorts clipping:** paste a **YouTube link** into the bot and it downloads the video, transcribes it, ranks the most **viral moments** with an LLM, and sends you back ready-to-post **vertical 9:16 Shorts** with burned-in captions. Inspired by [JayWebtech/autoshorts](https://github.com/JayWebtech/autoshorts). *(Approach summarized/rephrased for licensing compliance.)*
 
-| Workflow | File | What it does |
-|----------|------|--------------|
-| 📌 **Pinterest** | `workflows/pinterest_ai_complete.json` | Trends → ideas → DALL-E images → SEO copy → post (Pinterest API **or** Buffer toggle) |
-| 🎬 **YouTube + TikTok** | `workflows/youtube_tiktok_v5_smart.json` | ⭐ **v5 smart** — conversational, niche+style, **Pinterest/Pexels clip b-roll**, Buffer |
-| 📌 **Pinterest** | `workflows/pinterest_v2_smart.json` | **Smart** conversational pin maker (niche+style, propose→confirm) |
-| 📸 **Instagram** | `workflows/instagram_v1_telegram.json` | Conversational bot — set niche+style, then make carousel / image / Reel, Buffer posting |
-
-Jump to: [Pinterest](#-pinterest-automation) · [YouTube + TikTok](#-youtube--tiktok-automation)
+| File | What it is |
+|------|-----------|
+| `workflows/creative_director_v1.json` | ⭐ **THE workflow** — the all-in-one conversational studio (191 nodes) |
+| `workflows/creative_director_error_handler.json` | Error workflow — Telegram alert on any hard failure |
+| `config/creative_director_setup.md` | Full setup, commands, caveats |
+| `config/creative_director_schema.sql` | Supabase schema (run in SQL Editor, safe to re-run) |
 
 ---
 
-## 📌 Pinterest Automation
+## ✨ What it does
 
-A fully automated Pinterest content machine in a **single n8n workflow**. It discovers trends, writes ideas, generates images with DALL-E 3, writes SEO copy, and posts to Pinterest — with a **toggle** to switch between posting via the **Pinterest API** or **Buffer**. Data is stored in **Supabase**.
-
----
-
-## ✨ Key Features
-
-- 🧩 **One workflow file** — import a single JSON, no sub-workflows to wire up
-- 🎛️ **Posting toggle** — flip between `pinterest` and `buffer` in one node
-- 🗄️ **Supabase database** — Postgres backend via REST API
-- 🎨 **AI images** — DALL-E 3 generated, hosted on Imgbb
-- 📊 **Built-in analytics** — second trigger pulls daily Pinterest stats
-- 🔌 **Master on/off switch** — disable the whole automation instantly
+- 🧠 **Director Brain** (OpenRouter LLM) — conversational, concise, remembers recent turns, proposes **2-3 distinct on-brand angle options**, and **always confirms** before spending credits.
+- 🎨 **Master Creative Brief** — one brief acts as five specialists (Trend Strategist, Script Writer, Script Doctor, Art Director, Music Supervisor) and now enforces a **variety mandate + anti-repetition** (rotating hook angle + creative seed) so you don't get the same output twice.
+- 🖼️ **Images / carousels / videos** — AI images, AI-motion video, Pexels stock b-roll, or scraped Pinterest clips.
+- 📌 **Brand memory** — a rolling *brand bible* keeps every new post visually and tonally consistent.
+- ✅ **Human-in-the-loop approval gates** — approve/revise the script, the AI images, the clips, and the final post from Telegram.
+- ⏰ **Scheduling** — post now or queue for a set IST time; a 15-min trigger publishes due posts.
+- 📊 **Analytics loop** — every 6h it scores Buffer-posted performance and feeds the winners back into the brief.
+- 🎬 **YouTube clipping** (new) — paste a link, get back ranked vertical Shorts.
 
 ---
 
-## 🏗️ Architecture
+## 🎬 YouTube → Shorts clipping (AutoShorts-style)
+
+Send the bot a YouTube URL (optionally say "into 5 clips"). It runs this pipeline:
 
 ```
-TRIGGER 1: ⏰ Posting Schedule (every 4h)
-   │
-   ▼
-⚙️ CONTROL PANEL  ← 🎛️ TOGGLE: postingMethod, postsPerRun, enabled
-   │
-   ▼
-❓ Enabled? ──no──▶ ⏭️ Skip
-   │ yes
-   ▼
-💡 OpenAI: Generate Ideas  →  💾 Supabase: Insert Ideas
-   │
-   ▼
-🔄 Process Each Pin (loop):
-     ✍️ Image Prompt (OpenAI)
-       → 🎨 DALL-E 3 → ☁️ Imgbb host
-       → 📝 Pin Copy (OpenAI: title/desc/hashtags)
-       → 🔀 TOGGLE ─── buffer ──▶ 📱 Buffer: Post
-       │              └ pinterest ▶ 📌 Pinterest: Create Pin
-       → 💾 Supabase: Update Result
-   │
-   ▼
-✅ Run Complete
-
-TRIGGER 2: ⏰ Analytics Schedule (daily 9AM)
-   │
-   ▼
-💾 Supabase: Get Posted Pins → 📊 Pinterest Analytics → 💾 Supabase: Save Analytics
+YouTube link (Telegram)
+  → ⬇️ yt-dlp download + audio extract (ffmpeg)
+  → 🎙️ Transcribe (OpenAI Whisper, word/segment timestamps)
+  → 🧠 Rank viral moments (LLM: DeepSeek via OpenRouter) → start/end + hook + score
+  → 🎞️ FFmpeg: cut each moment, center-crop to vertical 1080×1920, burn synced captions
+  → 💬 sends each 9:16 Short back to you in Telegram (ranked, with a virality score)
 ```
+
+- **Default:** 3 clips per video. Say e.g. *"clip this into 5"* to change it (max 8).
+- **Clip length:** 15–60s each, snapped to sentence boundaries, non-overlapping.
+- **Model:** DeepSeek by default (cheap + strong reasoning); override with the `CLIP_LLM_MODEL` variable (any OpenRouter model).
+- **Requires** `yt-dlp` **and** `ffmpeg`/`ffprobe` on the self-hosted n8n host, plus `OPENAI_API_KEY` (Whisper) and `OPENROUTER_API_KEY`.
+
+> ⚠️ OpenAI Whisper caps uploaded audio at **25 MB** (~90 min at the 32 kbps mono the workflow extracts). For longer videos, swap in a chunked or Deepgram-based transcription step.
 
 ---
 
-## 🎛️ The Posting Toggle (most important part)
+## 💬 Talk to it (examples)
 
-Open the workflow → click the **`⚙️ CONTROL PANEL`** node → change values:
-
-| Field | Options | What it does |
-|-------|---------|--------------|
-| `postingMethod` | `pinterest` \| `buffer` | **Switches which service posts your pins** |
-| `postsPerRun` | number (e.g. `2`) | How many pins to create & post per run |
-| `niche` | text | Your content niche for idea generation |
-| `enabled` | `true` \| `false` | Master switch — set `false` to pause everything |
-
-> Set `postingMethod` to `buffer` → all pins go through Buffer.
-> Set it to `pinterest` → pins post directly via the Pinterest API.
-> No re-wiring needed — the **🔀 TOGGLE** node routes automatically.
-
----
-
-## 📋 Prerequisites
-
-- n8n (self-hosted or Cloud)
-- Supabase account (free tier works)
-- OpenAI API key (GPT-4o-mini + DALL-E 3, billing enabled)
-- Pinterest Developer App (Standard Access for public pins)
-- Imgbb API key (free image hosting)
-- Buffer account (only if using `buffer` mode)
-
----
-
-## 🚀 Setup Guide
-
-### Step 1 — Set up Supabase
-1. Create a project at [supabase.com](https://supabase.com)
-2. **SQL Editor → New Query** → paste [`config/supabase_schema.sql`](config/supabase_schema.sql) → **Run**
-3. **Project Settings → API** → copy the **Project URL** and **`service_role`** key
-
-### Step 2 — Set n8n Variables
-Add all variables from [`config/n8n_variables.md`](config/n8n_variables.md) under **Settings → Variables**:
 ```
-OPENAI_API_KEY, IMGBB_API_KEY,
-SUPABASE_URL, SUPABASE_SERVICE_KEY,
-PINTEREST_ACCESS_TOKEN, PINTEREST_BOARD_ID_FASHION/BEAUTY/LIFESTYLE/QUOTES,
-BUFFER_ACCESS_TOKEN, BUFFER_PROFILE_ID
-```
-> See [`config/credentials_guide.md`](config/credentials_guide.md) for how to get each one.
+set niche to indie coffee shops
+use warm film-grain cinematic style
+use pexels for video clips
+make a reel about 3 latte art tricks, post via buffer
+→ (bot proposes 2-3 angles) → yes
 
-### Step 3 — Import the Workflow
-In n8n: **Workflows → Import from File** → select
-[`workflows/pinterest_ai_complete.json`](workflows/pinterest_ai_complete.json)
+make a 6-slide carousel on cold brew myths
+post an image about our new menu
+schedule daily at 7pm
 
-### Step 4 — Set Your Toggle
-Open the **⚙️ CONTROL PANEL** node and choose your `postingMethod` and `postsPerRun`.
-
-### Step 5 — Activate
-Toggle the workflow **Active**. It now runs every 4 hours and posts automatically.
-Analytics run daily at 9 AM into your Supabase `analytics` table.
-
----
-
-## 🗄️ Database (Supabase)
-
-| Table | Purpose |
-|-------|---------|
-| `content_queue` | Main pipeline — every pin and its status |
-| `trends` | Discovered trending topics |
-| `analytics` | Daily pin performance metrics |
-| `logs` | Optional run logs |
-
-**Status lifecycle** (`content_queue.status`):
-```
-new_idea → has_image → ready_to_post → posted | posted_buffer | failed
+https://youtu.be/XXXX          ← auto-clips into Shorts
+clip this into 5: https://youtu.be/XXXX
 ```
 
 ---
 
-## 📁 File Structure
+## 🚀 Setup (short version)
 
-```
-pin-test/
-├── README.md
-├── workflows/
-│   └── pinterest_ai_complete.json   ← THE single all-in-one workflow
-└── config/
-    ├── supabase_schema.sql          ← Run this in Supabase SQL Editor
-    ├── n8n_variables.md             ← All variables to set
-    └── credentials_guide.md         ← How to get each API key
-```
+1. **Supabase** — run `config/creative_director_schema.sql`, create a public Storage bucket named `videos`.
+2. **n8n Variables** — `OPENROUTER_API_KEY`, `OPENROUTER_LLM_MODEL`, `OPENAI_API_KEY`, `IMGBB_API_KEY`, `PEXELS_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `BUFFER_ACCESS_TOKEN`, `BUFFER_PROFILE_ID_*`, `PINTEREST_ACCESS_TOKEN`, `PINTEREST_BOARD_ID_LIFESTYLE`, `TELEGRAM_CHAT_ID`, `FFMPEG_FONT`, `OPENAI_TTS_VOICE`, and (optional) `CLIP_LLM_MODEL`.
+3. **Credentials** — Telegram Bot (`TG_CRED_ID`) and YouTube OAuth2 (`YT_CRED_ID`).
+4. **Host** — self-hosted n8n with `ffmpeg`, `ffprobe`, `yt-dlp`, and `curl` on PATH (required for video render + clipping).
+5. Import `creative_director_error_handler.json`, activate it, and set `creative_director_v1.json` → `settings.errorWorkflow` to its workflow id.
+6. Import `creative_director_v1.json`, set your defaults by chatting, and **activate**.
+
+Full guide, all chat commands, and honest caveats: **[`config/creative_director_setup.md`](config/creative_director_setup.md)**.
 
 ---
 
-## ⚙️ Customization
-
-| Want to change... | Where |
-|-------------------|-------|
-| Posting service (Pinterest/Buffer) | ⚙️ CONTROL PANEL → `postingMethod` |
-| Posts per run | ⚙️ CONTROL PANEL → `postsPerRun` |
-| Pause everything | ⚙️ CONTROL PANEL → `enabled = false` |
-| Posting frequency | "⏰ Posting Schedule" node → interval |
-| Content niche | ⚙️ CONTROL PANEL → `niche` |
-| Image style | "✍️ Build Image Prompt" node → prompt text |
-
----
-
-## ❗ Pinterest Trial vs Standard Access
-
-When you first get Pinterest API access you're on **Trial Access** — pins are created
-successfully but are **only visible to you**. To make pins public, request **Standard Access**
-in the Pinterest developer portal (usually approved in a few days). The workflow works on
-Trial Access for testing; Buffer mode is unaffected by this.
-
----
-
-## 🐛 Troubleshooting
-
-| Problem | Fix |
-|---------|-----|
-| Supabase insert fails (401) | Use the `service_role` key, not `anon` |
-| DALL-E image broken on Pinterest | Imgbb hosting handles this; check `IMGBB_API_KEY` |
-| Pins not public | You're on Pinterest Trial Access — request Standard |
-| Buffer posts not appearing | Check `BUFFER_PROFILE_ID` matches your Pinterest profile |
-| Nothing posts | Check ⚙️ CONTROL PANEL → `enabled = true` |
-| Wrong service posting | Check ⚙️ CONTROL PANEL → `postingMethod` value |
-
----
-
-## 🛠️ Tech Stack
+## 🛠️ Tech stack
 
 | Component | Tech |
 |-----------|------|
-| Automation | n8n (single workflow) |
-| Database | Supabase (Postgres + REST) |
-| AI Text | OpenAI GPT-4o-mini |
-| AI Images | OpenAI DALL-E 3 |
-| Image Hosting | Imgbb |
-| Posting | Pinterest API v5 **or** Buffer (toggle) |
+| Automation | n8n (single workflow, self-hosted) |
+| Database / storage | Supabase (Postgres + Storage) |
+| LLM / images | OpenRouter (LLM, image, image→video) |
+| Transcription / TTS | OpenAI (Whisper, tts-1-hd) |
+| Clip ranking | DeepSeek via OpenRouter (`CLIP_LLM_MODEL`) |
+| Video / clipping | yt-dlp + FFmpeg (vertical 9:16, burned captions) |
+| Posting | Buffer (GraphQL) · YouTube Data API · Pinterest API v5 |
 
 ---
 
-*Built with ❤️ — a single-workflow, toggle-driven Pinterest content machine.*
+## ⚠️ Honest caveats
 
-
----
-
-## 🎬 YouTube + TikTok Automation
-
-> **Four versions available:**
-> - **`youtube_tiktok_v4_ondemand_openrouter.json`** ⭐⭐⭐ **newest** — **on-demand** Telegram bot, **OpenRouter image→video** (real AI video clips), **Script Writer + Script Doctor** reviewer
-> - `youtube_tiktok_v3_ffmpeg_telegram.json` — Telegram bot + FFmpeg, OpenAI-only, IST scheduling
-> - `youtube_tiktok_v2.json` — data-driven strategy + multi-scene (JSON2Video render)
-> - `youtube_tiktok_complete.json` — original single-image version (reference)
-
-A second all-in-one workflow that creates and publishes **short-form videos** to YouTube and/or TikTok automatically. It's modeled on the multi-agent architecture from [darkzOGx/youtube-automation-agent](https://github.com/darkzOGx/youtube-automation-agent), rebuilt for n8n with a TikTok publishing path added. *(Architecture notes were summarized/rephrased for licensing compliance.)*
-
-### ⭐ What's new in v2
-
-| Area | v1 | v2 (better) |
-|------|----|-------------|
-| **Strategy** | Picks a topic blind | **Data-driven** — feeds past top-performers + recent topics back into the strategy agent, and avoids repeats |
-| **Script** | One narration blob | **Retention framework** — hook → 3-4 value beats → payoff → CTA, scene-by-scene |
-| **Visuals** | Single static AI image | **Multi-scene** — real Pexels stock b-roll per scene + word-by-word captions |
-| **Model** | gpt-4o-mini | **gpt-4o** with `response_format: json_object` (reliable parsing) |
-| **Per-scene** | — | Each scene has its own narration, caption, and b-roll keyword |
-
-v2 needs the extra schema columns — run [`config/video_supabase_schema_v2.sql`](config/video_supabase_schema_v2.sql) **after** the base schema, and add `PEXELS_API_KEY`.
-
-### ⭐⭐ v3 — Telegram bot + FFmpeg (newest, OpenAI-only, near-free)
-
-The newest version is **controlled entirely from Telegram** and renders video with **FFmpeg** on your own server (no JSON2Video subscription). Full guide: [`config/video_v3_setup.md`](config/video_v3_setup.md).
-
-**Talk to it in plain English (times are IST):**
-- _"make a video about morning routines, post at best time"_
-- _"create a short on saving money, post tomorrow 7pm"_
-- _"set daily posting time to 18:30"_ → auto-posts daily at that time
-- _"set platform to both"_ · _"status"_
-
-**Three triggers:** `💬 Telegram Command` (on-demand) · `⏰ Daily Check` (hourly, fires at your set IST time) · `⏰ Publish Queue` (every 15 min, publishes when due).
-
-**Premium agents (OpenAI only):**
-- **Script** — gpt-4o, pattern-interrupt hook → value beats → payoff → CTA
-- **Thumbnail** — `gpt-image-1` (replaces deprecated DALL-E 3)
-- **Voiceover** — `tts-1-hd`
-- **Video** — FFmpeg stitches Pexels b-roll + voice + burned captions → vertical 1080×1920 MP4 → Supabase Storage
-
-| | v3 |
-|---|---|
-| Render | **FFmpeg** (self-hosted, $0) |
-| Control | **Telegram bot** + scheduled |
-| Cost | ~$0.10–0.25/video (OpenAI only) |
-| Requires | **self-hosted n8n** with ffmpeg/curl |
-
-> ⚠️ v3 needs **self-hosted n8n** (FFmpeg can't run on n8n Cloud). Run all three schema files (`_v2`, `_v3`) and create a public Supabase Storage bucket named `videos`.
-
-### ⭐⭐⭐ v4 — On-demand + OpenRouter image→video (real AI video, one key)
-
-The newest version is **fully on-demand** (no schedules) and animates **ChatGPT-style AI images into real video clips** using **OpenRouter** (one API key for the LLM, image generation, *and* image-to-video). Full guide: [`config/video_v4_setup.md`](config/video_v4_setup.md).
-
-**You give it a topic OR your own script:**
-- _"make a video about morning routines for students"_ → it writes the script
-- _"script: Ever wonder why... [your full script]"_ → it uses YOUR words
-
-**Pipeline:** Request → ✍️ Script Writer → 🩺 **Script Doctor** (reviews & improves) → 🔍 SEO → 🎨 AI image per scene → 🎬 OpenRouter image→video → 🎞️ FFmpeg (voice + captions) → ▶️ post → 💬 Telegram.
-
-| | v4 |
-|---|---|
-| Trigger | **On-demand only** (Telegram) |
-| Visuals | **AI image → AI video clip** per scene (OpenRouter) |
-| Brains | OpenRouter (one key): LLM + image + video |
-| Script QC | dedicated **Script Doctor** reviewer agent |
-| Cost | ~$0.6–1.6/video (model-dependent) |
-| Requires | self-hosted n8n (FFmpeg) + OpenRouter key |
-
-> The **Script Doctor** is a separate reviewer brain — it polishes the hook/pacing/CTA of either the AI draft or your supplied script, and tells you what it changed.
-
-
-### 🤝 The Agent Pipeline (mirrors the original 7 agents)
-
-| Agent | Role | Implemented with |
-|-------|------|------------------|
-| 1. Content Strategy | Picks a trending short-form topic + hook | OpenAI GPT-4o-mini |
-| 2. Script Writer | Writes 30-45s narration + caption lines | OpenAI |
-| 4. SEO Optimizer | Title, description, tags, hashtags | OpenAI |
-| 3. Thumbnail Designer | Generates thumbnail | DALL-E 3 → Imgbb |
-| 5. Production | Renders the video (image + TTS voice + captions) | JSON2Video |
-| 6. Publishing | Uploads on schedule | YouTube Data API v3 / TikTok Content Posting API |
-| 7. Analytics & Strategy | Daily stats + weekly review | OpenAI + Supabase |
-
-### 🎛️ Platform + Posting-Method Toggles
-
-Open the **⚙️ CONTROL PANEL** node and set two toggles:
-
-**`platform`** — which channel:
-| Value | Result |
-|-------|--------|
-| `youtube` | Publish to YouTube only |
-| `tiktok` | Publish to TikTok only |
-| `both` | Publish to YouTube **and** TikTok |
-
-**`postingMethod`** — how to post:
-| Value | Result |
-|-------|--------|
-| `api` | Native YouTube Data API + TikTok Content Posting API |
-| `buffer` | Post via **Buffer** to your connected YouTube/TikTok channels |
-
-Other toggles: `videosPerRun`, `bufferDays` (smart buffer — skip generating if enough queued), `niche`, `videoStyle`, `scheduleHour`, `enabled` (master switch).
-
-### ⏰ Four Schedules (same cadence as the original agent)
-
-| Trigger | Cron | Purpose |
-|---------|------|---------|
-| Content Gen | `0 6 * * *` | Generate new videos daily (respects buffer) |
-| Publish Queue | `*/15 * * * *` | Check renders + publish due videos |
-| Analytics | `0 9 * * *` | Collect views/likes/comments |
-| Weekly Strategy | `0 8 * * 0` | Review top performers, suggest next topics |
-
-### 🔄 Video Pipeline Flow
-
-```
-idea → rendering (JSON2Video) → ready → published → (analytics)
-```
-
-### 🚀 Setup
-1. Run [`config/video_supabase_schema.sql`](config/video_supabase_schema.sql) in Supabase
-2. Set the variables in [`config/video_variables.md`](config/video_variables.md)
-   (OpenAI, Imgbb, JSON2Video, Supabase, TikTok token)
-3. Create a **YouTube OAuth2** credential and select it in the YouTube nodes
-4. Import `workflows/youtube_tiktok_complete.json`
-5. Set the **⚙️ CONTROL PANEL** toggle (`youtube` / `tiktok` / `both`)
-6. Activate
-
-### ⚠️ Important Notes
-- **TikTok:** unaudited apps can only post privately (`SELF_ONLY`). Pass TikTok's app
-  audit to publish publicly, then change `privacy_level` in the **🎵 TikTok: Publish** node.
-  `PULL_FROM_URL` also requires a verified domain in the TikTok developer portal.
-- **Video rendering** uses JSON2Video (built-in TTS voice) — no separate voiceover service
-  needed. Swap the voice/style in the **🎬 Agent5: Build Render Job** node.
-- **YouTube quota:** uploads cost ~1600 quota units each; the default 10k/day quota allows
-  ~6 uploads/day unless you request more.
-
-### 📁 Video Automation Files
-```
-workflows/youtube_tiktok_v4_ondemand_openrouter.json  ← ⭐⭐⭐ newest (on-demand, OpenRouter image→video)
-workflows/youtube_tiktok_v3_ffmpeg_telegram.json      ← Telegram + FFmpeg, OpenAI-only
-workflows/youtube_tiktok_v2.json                      ← data-driven, multi-scene (JSON2Video)
-workflows/youtube_tiktok_complete.json                ← original version (reference)
-config/video_supabase_schema.sql                      ← base Supabase tables
-config/video_supabase_schema_v2.sql                   ← v2 extra columns
-config/video_supabase_schema_v3.sql                   ← v3 settings table + storage cols
-config/video_variables.md                             ← v1/v2 variables guide
-config/video_v3_setup.md                              ← v3 Telegram + FFmpeg setup
-config/video_v4_setup.md                              ← v4 on-demand + OpenRouter setup
-```
+- **Pinterest clips/images** are **scraped** (no official download API) — fragile and repost-risky. **Pexels is the safe default.**
+- **AI video** (`video_route=ai`) animates AI stills via an image→video model + FFmpeg; the generative-video provider endpoint must be wired to a real service.
+- **Buffer** posts one channel per call; carousels post as separate media.
+- **TikTok / Instagram via native API** aren't supported here (require app review / Graph API) — those fall back to Buffer.
+- **Whisper 25 MB limit** applies to the YouTube clipping transcription step.
 
 ---
 
 ## 🙏 Credits
 
-The YouTube + TikTok workflow's agent architecture is inspired by
-[darkzOGx/youtube-automation-agent](https://github.com/darkzOGx/youtube-automation-agent)
-by Haithum Abdelfattah.
-
-
----
-
-## 📸 Instagram Automation (conversational)
-
-`workflows/instagram_v1_telegram.json` is a **chat-driven** Instagram manager. You talk to it on Telegram; it understands, **confirms**, then creates and posts. Full guide: [`config/instagram_setup.md`](config/instagram_setup.md).
-
-### What it does
-- **🧠 Manager Brain** (OpenRouter LLM) — conversational; proposes a plan and waits for your "yes" before creating
-- **Per-chat niche + style** remembered in Supabase — everything (scripts, images, slides, Reels) matches them
-- **Visual style** you choose: _Disney Pixar 3D_, _animated stick figure_, _cinematic realism_, _anime_, etc.
-- Three creators: **Carousel**, **Image**, **Reel** (AI video via OpenRouter image→video + FFmpeg)
-- **Buffer** posting to Instagram
-
-### Example chat
-```
-you: set niche to budget travel for students
-bot: ✅ niche saved
-you: use Disney Pixar 3D style
-bot: ✅ style saved
-you: make a 6-slide carousel on packing hacks
-bot: Here's the plan... reply 'yes' to create
-you: yes
-bot: ✅ Carousel created! [slide URLs]
-```
-
-> Buffer's classic API posts one media per update, so Reels/images post cleanly; for true multi-image carousels the bot returns all slide URLs (or switch that node to the Instagram Graph API). See the setup doc.
-
-### Files
-```
-workflows/instagram_v1_telegram.json    ← the conversational Instagram workflow
-config/instagram_supabase_schema.sql     ← ig_state (niche/style/pending) + ig_queue
-config/instagram_setup.md                ← full setup + commands
-```
-
-
----
-
-## 🧠 Smart Conversational YouTube & Pinterest (+ Pinterest clip b-roll)
-
-Both now work like the Instagram bot — a **Manager Brain** chats with you, **proposes a plan and waits for your "yes"**, and remembers a **niche + style** per chat. Full guide: [`config/smart_workflows_setup.md`](config/smart_workflows_setup.md). Run [`config/smart_state_schema.sql`](config/smart_state_schema.sql) first.
-
-### 🎬 `youtube_tiktok_v5_smart.json` — clips b-roll
-- Set niche, style, **b-roll source** (`pexels` or `pinterest`), a **reference clip style**, and platform — all by chatting
-- Per scene it fetches a clip: **Pexels** (safe, default) or **Pinterest** (scrapes video pins for the script keyword / your reference phrase)
-- FFmpeg stitches clips + TTS voice + captions → posts via Buffer
-
-### 📌 `pinterest_v2_smart.json` — conversational pins
-- "set niche…", "style…", "make a pin about…" → proposes → you confirm → AI image + SEO copy → posts to Pinterest
-
-### ⚠️ Honest note on Pinterest clips
-There's **no official API** to download Pinterest video pins, so the YouTube workflow **scrapes** the search page — it can break when Pinterest changes their site and may breach their ToS, and the clips are **copyrighted by others** (repost risk). **Pexels is the safe default**; treat Pinterest clip mode as experimental.
-
-### Files
-```
-workflows/youtube_tiktok_v5_smart.json   ← smart YT/TikTok + Pinterest/Pexels clip b-roll
-workflows/pinterest_v2_smart.json        ← smart conversational pin maker
-config/smart_state_schema.sql            ← yt_state + pin_state tables
-config/smart_workflows_setup.md          ← full setup + commands
-```
+- YouTube → Shorts clipping inspired by **[JayWebtech/autoshorts](https://github.com/JayWebtech/autoshorts)** by Adamu Jethro (transcribe → AI viral-moment ranking → FFmpeg 9:16 auto-crop with captions). Reimplemented for n8n; approach summarized/rephrased for licensing compliance.

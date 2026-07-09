@@ -141,3 +141,54 @@ change posting time to 21:00  → updates post_time
 Every **6 hours** an Analytics Trigger pulls each Buffer-posted update's stats, computes a weighted engagement **score** (`likes + comments×3 + shares×5 + saves×4 + clicks×0.5 + reach×0.01`), stores it on the `cd_memory` row, and writes the **top performers** into `cd_state.winners`. The Director Brain and the Master Brief then read `winners` and **lean into the angles/styles that actually performed**.
 
 > **Caveat:** metrics are read from **Buffer** (the default posting method). Posts sent via the native APIs (YouTube/Pinterest) have no `buffer_id`, so they're skipped for now — the same pattern can be extended to the YouTube Data API / Pinterest v5 analytics.
+
+
+
+---
+
+## 🎬 YouTube → Shorts clipping (new, AutoShorts-style)
+
+Paste a **YouTube link** into the bot and it turns the long video into ready-to-post **vertical 9:16 Shorts**, ranked by viral potential. Inspired by [JayWebtech/autoshorts](https://github.com/JayWebtech/autoshorts) (approach summarized/rephrased for licensing compliance).
+
+**How it works** — the moment the Intake node sees a YouTube URL in your message, it routes to a dedicated clipping pipeline (it does **not** go through the Director/brief flow):
+
+```
+Intake detects YouTube URL
+  → 💬 Clip: Ack (instant "downloading…" reply)
+  → 🧩 Clip: Prep      (builds a yt-dlp + ffmpeg shell job)
+  → ⬇️ Clip: Download  (yt-dlp best ≤1080p mp4 + extracts 16 kHz mono mp3)
+  → 📂 Clip: Read Audio → 🎙️ Clip: Transcribe (OpenAI Whisper, verbose_json segments)
+  → 🧠 Clip: Rank Prompt → 🤖 OpenRouter: Clip Ranker (DeepSeek by default)
+  → 📋 Clip: Parse Moments (clamps to 10–90 s, non-overlapping, ranked)
+  → 🎞️ Clip: Build FFmpeg (center-crop to 1080×1920 + burned SRT captions per clip)
+  → 🖥️ Clip: Render → 📤 Explode → 📂 Read MP4 → 💬 Clip: Send (one video per clip)
+```
+
+**Usage:**
+```
+https://youtu.be/XXXXXXXX               → 3 clips (default)
+clip this into 5: https://youtu.be/XXX  → 5 clips (max 8)
+```
+
+**Requirements (self-hosted n8n host):**
+- `yt-dlp` on PATH (`pip install -U yt-dlp` or your package manager) — for downloading the source video.
+- `ffmpeg` + `ffprobe` on PATH — already required for the video render engine.
+- `OPENAI_API_KEY` (Whisper transcription) and `OPENROUTER_API_KEY` (moment ranking) — both already used elsewhere.
+
+**New variable (optional):**
+- `CLIP_LLM_MODEL` — OpenRouter model used to rank viral moments. Defaults to `deepseek/deepseek-chat` (cheap, strong reasoning; matches the AutoShorts recommendation). You can set it to `anthropic/claude-3.5-sonnet` for premium hook copywriting or any other OpenRouter model.
+
+**Caveats:**
+- OpenAI Whisper caps uploaded audio at **25 MB** (~90 min at the 32 kbps mono this workflow extracts). Longer videos will fail transcription with a clear error — split them, or replace `🎙️ Clip: Transcribe` with a chunked or Deepgram-based step.
+- Clips are center-cropped (faces/action off-center may get cut). Captions are burned from the Whisper transcript, synced per clip.
+- Clips are sent straight back to Telegram (not auto-posted). To publish one, download it and feed it back through the normal create/post flow, or extend `💬 Clip: Send` into the Buffer/API posting chain.
+
+---
+
+## 🔧 Production-readiness fixes applied
+
+- **`video_route=pexels` is now wired.** Previously the `🔀 Visual Source` switch had no `pexels` output, so choosing Pexels for video silently fell through to the AI-video path and the `📷 Scene: Pexels Clip` node was unreachable. Pexels is now a first-class, reliable video b-roll route (`ai · pexels · pinterest · hyperframes`).
+- **`🔀 Content Type`** now has a fallback → a friendly "unsupported type" reply instead of silently dropping the run.
+- **`🔀 API Route`** fallback fixed (was an invalid `fallbackOutput` value) → routes unexpected values to the "API not supported" reply.
+
+> Still requires your attention after import: set `settings.errorWorkflow` to the imported error-handler's id (n8n can't know the id until you import it), and verify your Buffer GraphQL endpoint/token against Buffer's current API.
