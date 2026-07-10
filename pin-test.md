@@ -116,12 +116,12 @@ In n8n → **Settings → Variables**, add each of these (the workflow reads the
 | `SUPABASE_SERVICE_KEY` | Supabase service_role key |
 | `TELEGRAM_CHAT_ID` | your Telegram chat/user id |
 | `BUFFER_ACCESS_TOKEN` | Buffer token *(for posting)* |
-| `BUFFER_PROFILE_ID_INSTAGRAM` / `_YOUTUBE` / `_PINTEREST` / `_FACEBOOK` | Buffer channel ids |
+| `BUFFER_PROFILE_ID_INSTAGRAM` / `_YOUTUBE` / `_PINTEREST` / `_FACEBOOK` / `_TIKTOK` | Buffer channel ids |
 | `PINTEREST_ACCESS_TOKEN`, `PINTEREST_BOARD_ID_LIFESTYLE` | *(optional)* Pinterest API |
 | `FFMPEG_FONT` | e.g. `/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf` |
 | `OPENAI_TTS_VOICE` | e.g. `onyx` |
 
-> Buffer note: Buffer supports Instagram, Facebook, Pinterest, YouTube, LinkedIn, X, Threads, Bluesky, Mastodon — **not TikTok**.
+> Buffer note: posting goes to Instagram, Facebook, Pinterest, YouTube, and TikTok — set the matching `BUFFER_PROFILE_ID_*` channel id for each one you use.
 
 ---
 
