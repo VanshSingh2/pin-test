@@ -3545,8 +3545,25 @@
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "=https://api.bufferapp.com/1/updates/{{ $json.buffer_id }}.json?access_token={{ $vars.BUFFER_ACCESS_TOKEN }}",
+        "method": "POST",
+        "url": "https://api.buffer.com",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.BUFFER_ACCESS_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ query: 'query GetPostMetrics { post(input: { id: ' + JSON.stringify($json.buffer_id) + ' }) { id channelId metrics { type name value unit } metricsUpdatedAt } }' }) }}",
         "options": {
           "response": {
             "response": {
@@ -3562,11 +3579,14 @@
       "position": [
         -40,
         2100
-      ]
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
     },
     {
       "parameters": {
-        "jsCode": "const meta=$('📤 Explode Posts').item.json; const resp=$json||{}; const st=(resp.statistics)||{}; const likes=+(st.favorites||st.likes||0); const comments=+(st.comments||0); const shares=+(st.shares||st.retweets||0); const saves=+(st.saves||0); const reach=+(st.reach||st.impressions||0); const clicks=+(st.clicks||0); const score=likes + comments*3 + shares*5 + saves*4 + clicks*0.5 + reach*0.01; return [{ json:{ id:meta.id, chat_id:meta.chat_id, topic:meta.topic, style:meta.style, platform:meta.platform, metrics:{likes,comments,shares,saves,reach,clicks}, score:Math.round(score*100)/100 } }];"
+        "jsCode": "const meta=$('📤 Explode Posts').item.json;\nconst resp=$json||{};\nconst post=(resp.data && resp.data.post) || {};\nconst arr=Array.isArray(post.metrics)?post.metrics:[];\nconst gqlErr=(resp.errors && resp.errors[0] && resp.errors[0].message) || '';\n// Buffer returns a normalized array of { type, name, value, unit } — bucket by name.\nconst M={};\nfor(const m of arr){ const k=String(m.name||m.type||'').toLowerCase().replace(/[^a-z]/g,''); M[k]=(M[k]||0)+(Number(m.value)||0); }\nconst pick=(...keys)=>keys.reduce((s,k)=>s+(M[k]||0),0);\nconst likes=pick('likes','reactions','favorites');\nconst comments=pick('comments','replies');\nconst shares=pick('shares','reposts','retweets');\nconst saves=pick('saves','bookmarks');\nconst clicks=pick('clicks','linkclicks','urlclicks','postclicks');\nconst reach=M['reach']||M['impressions']||M['views']||M['plays']||0;\nconst score=likes + comments*3 + shares*5 + saves*4 + clicks*0.5 + reach*0.01;\nreturn [{ json:{ id:meta.id, chat_id:meta.chat_id, topic:meta.topic, style:meta.style, platform:meta.platform, metrics:{likes,comments,shares,saves,reach,clicks}, score:Math.round(score*100)/100, __metrics_error:gqlErr } }];"
       },
       "id": "cd-an-score",
       "name": "🧮 Score & Merge",

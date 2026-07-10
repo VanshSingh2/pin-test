@@ -121,7 +121,7 @@ In n8n → **Settings → Variables**, add each of these (the workflow reads the
 | `FFMPEG_FONT` | e.g. `/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf` |
 | `OPENAI_TTS_VOICE` | e.g. `onyx` |
 
-> Buffer note: posting goes to Instagram, Facebook, Pinterest, YouTube, and TikTok — set the matching `BUFFER_PROFILE_ID_*` channel id for each one you use.
+> Buffer note: posting goes to Instagram, Facebook, Pinterest, YouTube, and TikTok — set the matching `BUFFER_PROFILE_ID_*` channel id for each one you use. The 6-hourly analytics loop reads Buffer's post `metrics`, which requires `BUFFER_ACCESS_TOKEN` to be a **personal API key** (Buffer's metrics API is personal-use only).
 
 ---
 
